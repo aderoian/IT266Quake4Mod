@@ -43,6 +43,9 @@ protected:
 	float								guideRange;
 	float								guideAccelTime;
 
+	int									lastProjectileThink;
+	idList < idEntityPtr<idEntity>>		rocketProjectiles;
+
 	rvStateThread						rocketThread;
 
 	float								reloadRate;
@@ -60,6 +63,8 @@ private:
 	stateResult_t		State_Rocket_Reload		( const stateParms_t& parms );
 	
 	stateResult_t		Frame_AddToClip			( const stateParms_t& parms );
+
+	void Attack(bool altAttack, int num_attacks, float spread, float fuseOffset, float power);
 	
 	CLASS_STATES_PROTOTYPE ( rvWeaponRocketLauncher );
 };
@@ -96,7 +101,7 @@ void rvWeaponRocketLauncher::Spawn ( void ) {
 
 	idleEmpty = false;
 	
-	spawnArgs.GetFloat ( "lockRange", "0", guideRange );
+	spawnArgs.GetFloat ( "lockRange", "100.0", guideRange );
 
 	spawnArgs.GetFloat ( "lockSlowdown", ".25", f );
 	attackDict.GetFloat ( "speed", "0", guideSpeedFast );
@@ -105,6 +110,8 @@ void rvWeaponRocketLauncher::Spawn ( void ) {
 	reloadRate = SEC2MS ( spawnArgs.GetFloat ( "reloadRate", ".8" ) );
 	
 	guideAccelTime = SEC2MS ( spawnArgs.GetFloat ( "lockAccelTime", ".25" ) );
+
+	lastProjectileThink = gameLocal.GetTime();
 	
 	// Start rocket thread
 	rocketThread.SetName ( viewModel->GetName ( ) );
@@ -141,10 +148,35 @@ void rvWeaponRocketLauncher::Think ( void ) {
 	trace_t	tr;
 	int		i;
 
-	rocketThread.Execute ( );
-
 	// Let the real weapon think first
 	rvWeapon::Think ( );
+
+	// absolute rocket hell
+	if ((gameLocal.GetTime() - 100) - lastProjectileThink > 400) {
+		idList < idEntityPtr<idEntity>> toTick = rocketProjectiles;
+		rocketProjectiles.Clear();
+
+		for (i = toTick.Num() - 1; i >= 0; i--) {
+			idProjectile* proj = static_cast<idProjectile*>(toTick[i].GetEntity());
+			if (!proj || proj->IsHidden()) {
+				continue;
+			}
+
+			idPhysics* physics = proj->GetPhysics();
+			if (!physics) {
+				continue;
+			}
+
+			int splitAmount = 3;
+			float splitSpread = 10.0f;
+			LaunchProjectiles(attackDict, physics->GetOrigin(), physics->GetAxis(), splitAmount, splitSpread, 0, 1.0f);
+
+		}
+
+		lastProjectileThink = gameLocal.GetTime();
+	}
+
+	rocketThread.Execute ( );
 
 	// IF no guide range is set then we dont have the mod yet	
 	if ( !guideRange ) {
@@ -215,6 +247,9 @@ void rvWeaponRocketLauncher::OnLaunchProjectile ( idProjectile* proj ) {
 
 	// Double check that its actually a guided projectile
 	if ( !proj || !proj->IsType ( idGuidedProjectile::GetClassType() ) ) {
+		idEntityPtr<idEntity> ptr;
+		ptr = proj;
+		rocketProjectiles.Append(ptr);
 		return;
 	}
 
@@ -445,7 +480,7 @@ stateResult_t rvWeaponRocketLauncher::State_Fire ( const stateParms_t& parms ) {
 	};	
 	switch ( parms.stage ) {
 		case STAGE_INIT:
-			nextAttackTime = gameLocal.time + (fireRate * owner->PowerUpModifier ( PMOD_FIRERATE ));		
+			nextAttackTime = gameLocal.time + (fireRate * owner->PowerUpModifier ( PMOD_FIRERATE ));
 			Attack ( false, 1, spread, 0, 1.0f );
 			PlayAnim ( ANIMCHANNEL_LEGS, "fire", parms.blendFrames );	
 			return SRESULT_STAGE ( STAGE_WAIT );
@@ -579,5 +614,106 @@ rvWeaponRocketLauncher::Frame_AddToClip
 stateResult_t rvWeaponRocketLauncher::Frame_AddToClip ( const stateParms_t& parms ) {
 	AddToClip ( 1 );
 	return SRESULT_OK;
+}
+
+void rvWeaponRocketLauncher::Attack(bool altAttack, int num_attacks, float spread, float fuseOffset, float power) {
+	idVec3 muzzleOrigin;
+	idMat3 muzzleAxis;
+
+	if (!viewModel) {
+		common->Warning("NULL viewmodel %s\n", __FUNCTION__);
+		return;
+	}
+
+	if (viewModel->IsHidden()) {
+		return;
+	}
+
+	// avoid all ammo considerations on an MP client
+	if (!gameLocal.isClient) {
+		// check if we're out of ammo or the clip is empty
+		int ammoAvail = owner->inventory.HasAmmo(ammoType, ammoRequired);
+		if (!ammoAvail || ((clipSize != 0) && (ammoClip <= 0))) {
+			return;
+		}
+
+		owner->inventory.UseAmmo(ammoType, ammoRequired);
+		if (clipSize && ammoRequired) {
+			clipPredictTime = gameLocal.time;	// mp client: we predict this. mark time so we're not confused by snapshots
+			ammoClip -= 1;
+		}
+
+		// wake up nearby monsters
+		if (!wfl.silent_fire) {
+			gameLocal.AlertAI(owner);
+		}
+	}
+
+	// set the shader parm to the time of last projectile firing,
+	// which the gun material shaders can reference for single shot barrel glows, etc
+	viewModel->SetShaderParm(SHADERPARM_DIVERSITY, gameLocal.random.CRandomFloat());
+	viewModel->SetShaderParm(SHADERPARM_TIMEOFFSET, -MS2SEC(gameLocal.realClientTime));
+
+	if (worldModel.GetEntity()) {
+		worldModel->SetShaderParm(SHADERPARM_DIVERSITY, viewModel->GetRenderEntity()->shaderParms[SHADERPARM_DIVERSITY]);
+		worldModel->SetShaderParm(SHADERPARM_TIMEOFFSET, viewModel->GetRenderEntity()->shaderParms[SHADERPARM_TIMEOFFSET]);
+	}
+
+	// calculate the muzzle position
+	if (barrelJointView != INVALID_JOINT && spawnArgs.GetBool("launchFromBarrel")) {
+		// there is an explicit joint for the muzzle
+		GetGlobalJointTransform(true, barrelJointView, muzzleOrigin, muzzleAxis);
+	}
+	else {
+		// go straight out of the view
+		muzzleOrigin = playerViewOrigin;
+		muzzleAxis = playerViewAxis;
+		muzzleOrigin += playerViewAxis[0] * muzzleOffset;
+	}
+
+	// add some to the kick time, incrementally moving repeat firing weapons back
+	if (kick_endtime < gameLocal.realClientTime) {
+		kick_endtime = gameLocal.realClientTime;
+	}
+	kick_endtime += muzzle_kick_time;
+	if (kick_endtime > gameLocal.realClientTime + muzzle_kick_maxtime) {
+		kick_endtime = gameLocal.realClientTime + muzzle_kick_maxtime;
+	}
+
+	// add the muzzleflash
+	MuzzleFlash();
+
+	// quad damage overlays a sound
+	if (owner->PowerUpActive(POWERUP_QUADDAMAGE)) {
+		viewModel->StartSound("snd_quaddamage", SND_CHANNEL_VOICE, 0, false, NULL);
+	}
+
+	// Muzzle flash effect
+	bool muzzleTint = spawnArgs.GetBool("muzzleTint");
+	viewModel->PlayEffect("fx_muzzleflash", flashJointView, false, vec3_origin, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one);
+
+	if (worldModel && flashJointWorld != INVALID_JOINT) {
+		worldModel->PlayEffect(gameLocal.GetEffect(weaponDef->dict, "fx_muzzleflash_world"), flashJointWorld, vec3_origin, mat3_identity, false, vec3_origin, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one);
+	}
+
+	owner->WeaponFireFeedback(&weaponDef->dict);
+
+	// Inform the gui of the ammo change
+	viewModel->PostGUIEvent("weapon_ammo");
+	if (ammoClip == 0 && AmmoAvailable() == 0) {
+		viewModel->PostGUIEvent("weapon_noammo");
+	}
+
+	// The attack is only a projectile
+	if (!gameLocal.isClient) {
+		idDict& dict = altAttack ? attackAltDict : attackDict;
+		power *= owner->PowerUpModifier(PMOD_PROJECTILE_DAMAGE);
+		
+		LaunchProjectiles(dict, muzzleOrigin, muzzleAxis, num_attacks, spread, fuseOffset, power);
+		
+		//asalmon:  changed to keep stats even in single player 
+		statManager->WeaponFired(owner, weaponIndex, num_attacks);
+
+	}
 }
 
