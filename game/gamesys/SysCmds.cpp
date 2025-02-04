@@ -3038,6 +3038,16 @@ void Cmd_ClientOverflowReliable_f( const idCmdArgs& args ) {
 }
 #endif
 
+void Cmd_WhereAmI_f(const idCmdArgs& args) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if (!player) {
+		return;
+	}
+
+	idVec3 view = player->firstPersonViewOrigin;
+	gameLocal.Printf("Player's current position: <%f, %f, %f>\n", view.x, view.y, view.z);
+}
+
 /*
 =================
 idGameLocal::InitConsoleCommands
@@ -3232,7 +3242,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "buyMenu",				Cmd_ToggleBuyMenu_f,		CMD_FL_GAME,				"Toggle buy menu (if in a buy zone and the game type supports it)" );
 	cmdSystem->AddCommand( "buy",					Cmd_BuyItem_f,				CMD_FL_GAME,				"Buy an item (if in a buy zone and the game type supports it)" );
 // RITUAL END
-
+	cmdSystem->AddCommand("whereami", Cmd_WhereAmI_f, CMD_FL_GAME | CMD_FL_CHEAT, "print where I currently am");
 }
 
 /*
