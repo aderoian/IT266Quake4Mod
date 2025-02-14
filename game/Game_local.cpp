@@ -587,6 +587,8 @@ void idGameLocal::Init( void ) {
 // RAVEN END
 
 	networkSystem->AddSortFunction( filterByMod );
+
+	towerManager = new TowerManager();
 }
 
 /*

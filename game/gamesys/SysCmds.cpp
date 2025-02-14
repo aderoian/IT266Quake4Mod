@@ -3048,6 +3048,11 @@ void Cmd_WhereAmI_f(const idCmdArgs& args) {
 	gameLocal.Printf("Player's current position: <%f, %f, %f>\n", view.x, view.y, view.z);
 }
 
+// MODDED COMMANDS
+void Cmd_StartGame_f(const idCmdArgs& args) {
+	gameLocal.towerManager->Init();
+}
+
 /*
 =================
 idGameLocal::InitConsoleCommands
@@ -3243,6 +3248,10 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "buy",					Cmd_BuyItem_f,				CMD_FL_GAME,				"Buy an item (if in a buy zone and the game type supports it)" );
 // RITUAL END
 	cmdSystem->AddCommand("whereami", Cmd_WhereAmI_f, CMD_FL_GAME | CMD_FL_CHEAT, "print where I currently am");
+
+
+	// MODDED COMMANDS
+	cmdSystem->AddCommand("startgame", Cmd_StartGame_f, CMD_FL_GAME | CMD_FL_CHEAT, "starts the game");
 }
 
 /*

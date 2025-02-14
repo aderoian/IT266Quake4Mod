@@ -316,6 +316,7 @@ class rvGravityArea;
 //============================================================================
 // ddynerman: moved MultiplayerGame.h down here, so it can use more stuff in Game_local (idEntityPtr)
 #include "MultiplayerGame.h"
+#include "Tower.h"
 
 //============================================================================
 
@@ -441,6 +442,8 @@ public:
 
 	int filterMod;
 	idList<idStr> modList;
+
+	TowerManager* towerManager;
 
 	// ---------------------- Public idGame Interface -------------------
 

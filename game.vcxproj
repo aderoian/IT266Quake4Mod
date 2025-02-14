@@ -346,6 +346,7 @@
     <ClCompile Include="game\spawner.cpp" />
     <ClCompile Include="game\SplineMover.cpp" />
     <ClCompile Include="game\Target.cpp" />
+    <ClCompile Include="game\Tower.cpp" />
     <ClCompile Include="game\TramGate.cpp" />
     <ClCompile Include="game\Trigger.cpp" />
     <ClCompile Include="game\vehicle\Vehicle.cpp" />
@@ -467,6 +468,7 @@
     <ClInclude Include="game\spawner.h" />
     <ClInclude Include="game\SplineMover.h" />
     <ClInclude Include="game\Target.h" />
+    <ClInclude Include="game\Tower.h" />
     <ClInclude Include="game\TramGate.h" />
     <ClInclude Include="game\Trigger.h" />
     <ClInclude Include="game\vehicle\Vehicle.h" />
