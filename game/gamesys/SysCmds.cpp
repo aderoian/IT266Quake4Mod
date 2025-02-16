@@ -3048,10 +3048,27 @@ void Cmd_WhereAmI_f(const idCmdArgs& args) {
 	gameLocal.Printf("Player's current position: <%f, %f, %f>\n", view.x, view.y, view.z);
 }
 
-// MODDED COMMANDS
+// MOD START
 void Cmd_StartGame_f(const idCmdArgs& args) {
 	gameLocal.towerManager->Init();
 }
+
+void Cmd_CreateTower_f(const idCmdArgs& args) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if (!player) {
+		return;
+	}
+
+	if (args.Argc() < 2) {
+		gameLocal.Printf("Usage: createTower <towerType>\n");
+		return;
+	}
+	idStr towerType = args.Argv(1);
+	Tower tower = Tower(player, towerType);
+	tower.Init(player->firstPersonViewOrigin);
+	tower.SpawnTower();
+}
+// MOD END
 
 /*
 =================
@@ -3250,8 +3267,10 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("whereami", Cmd_WhereAmI_f, CMD_FL_GAME | CMD_FL_CHEAT, "print where I currently am");
 
 
-	// MODDED COMMANDS
+// MOD BEGIN
 	cmdSystem->AddCommand("startgame", Cmd_StartGame_f, CMD_FL_GAME | CMD_FL_CHEAT, "starts the game");
+	cmdSystem->AddCommand("createtower", Cmd_CreateTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a tower");
+// MOD END
 }
 
 /*
