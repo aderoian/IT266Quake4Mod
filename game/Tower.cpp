@@ -94,7 +94,70 @@ void Tower::Shoot(void)
 
 void Tower::ForceShoot(void)
 {
-	// TODO: shoot logic
+	TowerShootFunc_t shootFunc = tower->shootFunc;
+	if (shootFunc) {
+		shootFunc(this);
+	}
+}
+
+void Tower::ShootDarkMatter(Tower* tower)
+{
+}
+
+void Tower::ShootGauntlet(Tower* tower)
+{
+}
+
+void Tower::ShootGrenadeLauncher(Tower* tower)
+{
+}
+
+void Tower::ShootHyperBlaster(Tower* tower)
+{
+}
+
+void Tower::ShootLightning(Tower* tower)
+{
+}
+
+void Tower::ShootMachineGun(Tower* tower)
+{
+}
+
+void Tower::ShootNailGun(Tower* tower)
+{
+}
+
+void Tower::ShootNapalm(Tower* tower)
+{
+}
+
+void Tower::ShootRailgun(Tower* tower)
+{
+}
+
+void Tower::ShootRocketLauncher(Tower* tower)
+{
+}
+
+void Tower::GenerateGold(Tower* tower)
+{
+}
+
+void Tower::GenerateEnergy(Tower* tower)
+{
+}
+
+void Tower::GenerateStone(Tower* tower)
+{
+}
+
+void Tower::GenerateWood(Tower* tower)
+{
+}
+
+void Tower::GenerateBuilder(Tower* tower)
+{
 }
 
 TowerManager::TowerManager(void)
@@ -114,19 +177,23 @@ TowerManager::TowerManager(void)
 	towers = idList<Tower*>();
 
 	// Register Tower Definitions
-	Register(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 0, 0, 0));
-	Register(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(), 0, 0, 0, Tower::ShootDarkMatter));
+	Register(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 0, 0, 0, Tower::ShootGauntlet));
+	Register(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootGrenadeLauncher));
+	Register(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(), 0, 0, 0, Tower::ShootHyperBlaster));
+	Register(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 0, 0, 0, Tower::ShootLightning));
+	Register(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(), 0, 0, 0, Tower::ShootMachineGun));
+	Register(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNailGun));
+	Register(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNapalm));
+	Register(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 0, 0, 0, Tower::ShootRailgun));
+	Register(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootRocketLauncher));
 
 	// Economy Towers
-	Register(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(100, 0, 0), 0, 0, 0));
+	Register(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateGold));
+	Register(new TowerDef("energy_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateEnergy));
+	Register(new TowerDef("stone_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateStone));
+	Register(new TowerDef("wood_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateWood));
+	Register(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateBuilder));
 }
 
 TowerManager::~TowerManager(void)

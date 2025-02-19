@@ -57,6 +57,7 @@ struct TowerDef {
 	int damage;
 	int range;
 	int shootDelay;
+	TowerShootFunc_t shootFunc;
 
 	TowerDef() {
 		this->name = "";
@@ -65,15 +66,17 @@ struct TowerDef {
 		this->damage = 0;
 		this->range = 0;
 		this->shootDelay = 0;
+		this->shootFunc = nullptr;
 	}
 
-	TowerDef(idStr name, idStr model, ResourceCost cost, int damage, int range, int shootDelay) {
+	TowerDef(idStr name, idStr model, ResourceCost cost, int damage, int range, int shootDelay, TowerShootFunc_t shootFunc) {
 		this->name = name;
 		this->model = model;
 		this->cost = cost;
 		this->damage = damage;
 		this->range = range;
 		this->shootDelay = shootDelay;
+		this->shootFunc = shootFunc;
 	}
 };
 
@@ -116,6 +119,22 @@ public:
 	void Shoot(void);
 	void ForceShoot(void); // Shoots without checking if we can actually shoot
 
+	static void ShootDarkMatter(Tower* tower);
+	static void ShootGauntlet(Tower* tower);
+	static void ShootGrenadeLauncher(Tower* tower);
+	static void ShootHyperBlaster(Tower* tower);
+	static void ShootLightning(Tower* tower);
+	static void ShootMachineGun(Tower* tower);
+	static void ShootNailGun(Tower* tower);
+	static void ShootNapalm(Tower* tower);
+	static void ShootRailgun(Tower* tower);
+	static void ShootRocketLauncher(Tower* tower);
+	static void GenerateGold(Tower* tower);
+	static void GenerateEnergy(Tower* tower);
+	static void GenerateStone(Tower* tower);
+	static void GenerateWood(Tower* tower);
+	static void GenerateBuilder(Tower* tower);
+
 private:
 	idPlayer* owner;
 	const TowerDef* tower;
@@ -129,6 +148,8 @@ private:
 private:
 	void SpawnTower();
 };
+
+typedef void (*TowerShootFunc_t)(Tower* tower);
 
 class TowerManager {
 public:
