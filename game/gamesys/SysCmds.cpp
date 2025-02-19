@@ -3063,8 +3063,8 @@ void Cmd_CreateTower_f(const idCmdArgs& args) {
 		gameLocal.Printf("Usage: createTower <towerType>\n");
 		return;
 	}
-	idStr towerType = args.Argv(1);
-	Tower tower = Tower(player, towerType);
+	auto towerDef = gameLocal.towerManager->towerDefinitions[args.Argv(1)];
+	Tower tower = Tower(player, towerDef);
 	tower.Init(player->firstPersonViewOrigin);
 }
 
@@ -3089,8 +3089,24 @@ void Cmd_BuildTower_f(const idCmdArgs& args) {
 		return;
 	}
 
-	towerManager->buildTower = args.Argv(1);
-	gameLocal.Printf("Tower build type has been set to %s\n", towerManager->buildTower);
+	towerManager->buildTower = towerManager->towerDefinitions[args.Argv(1)];
+	gameLocal.Printf("Tower build type has been set to %s\n", towerManager->buildTower->name.c_str());
+}
+
+void Cmd_TowerDefs_f(const idCmdArgs& args) {
+	TowerManager* towerManager = gameLocal.towerManager;
+	if (!towerManager) {
+		return;
+	}
+
+	if (args.Argc() > 1) {
+		// TODO: Descriptive to specific tower (show upgrades, etc.)
+	}
+
+	for (int i = 0; i < towerManager->towerDefinitions.Num(); i++) {
+		auto towerDef = towerManager->towerDefinitions[i];
+		gameLocal.Printf("Tower %d: %s\n", i, towerDef->name.c_str());
+	}
 }
 // MOD END
 
@@ -3293,9 +3309,10 @@ void idGameLocal::InitConsoleCommands( void ) {
 
 // MOD BEGIN
 	cmdSystem->AddCommand("startgame", Cmd_StartGame_f, CMD_FL_GAME | CMD_FL_CHEAT, "starts the game");
-	cmdSystem->AddCommand("createtower", Cmd_CreateTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a tower");
+	cmdSystem->AddCommand("createtower", Cmd_CreateTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a tower", TowerManager::ArgCompletion_TowerDefs);
 	cmdSystem->AddCommand("togglebuild", Cmd_ToggleBuild_f, CMD_FL_GAME | CMD_FL_CHEAT, "toggles build mode");
 	cmdSystem->AddCommand("buildtower", Cmd_BuildTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "sets the build tower type", TowerManager::ArgCompletion_TowerDefs);
+	cmdSystem->AddCommand("towerdefs", Cmd_TowerDefs_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists tower definitions");
 // MOD END
 }
 

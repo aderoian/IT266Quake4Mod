@@ -106,7 +106,7 @@ public:
 	int id;
 
 public:
-	Tower(idPlayer* owner, idStr tower);
+	Tower(idPlayer* owner, const TowerDef* tower);
 	~Tower(void);
 	void Init(idVec3 origin);
 	void Update(void);
@@ -118,7 +118,7 @@ public:
 
 private:
 	idPlayer* owner;
-	idStr tower;
+	const TowerDef* tower;
 	idVec3 origin;
 	idEntity* towerEntity;
 
@@ -135,7 +135,7 @@ public:
 	int towerId;
 
 	bool buildMode;
-	const char* buildTower;
+	const TowerDef* buildTower;
 	TowerDefList towerDefinitions;
 
 public:

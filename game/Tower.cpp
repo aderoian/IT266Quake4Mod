@@ -4,7 +4,7 @@
 #include "Tower.h"
 #include "Game_local.h"
 
-Tower::Tower(idPlayer* owner, idStr tower)  
+Tower::Tower(idPlayer* owner, const TowerDef* tower)  
 {  
    this->owner = owner;  
    this->tower = tower;  
@@ -42,11 +42,16 @@ void Tower::SpawnTower()
 
 	yaw = owner->viewAngles.yaw;
 
+	if (!tower) {
+		gameLocal.Printf("failed to spawn tower: no tower definition\n");
+		return;
+	}
+	
 	dict.Set("classname", "player_animatedentity");
 	dict.Set("angle", va("%f", yaw + 180));
 
 	dict.Set("origin", origin.ToString());
-	dict.Set("model", "weapon_rocketlauncher_world");
+	dict.Set("model", tower->model.c_str());
 
 	idEntity* newEnt = NULL;
 	gameLocal.SpawnEntityDef(dict, &newEnt);
@@ -99,7 +104,7 @@ TowerManager::TowerManager(void)
 	towerId = 0;
 
 	buildMode = false;
-	buildTower = "tower";
+	buildTower = nullptr;
 
 	lastWaveStart = -1;
 	lastWaveEnd = -1;
@@ -109,6 +114,15 @@ TowerManager::TowerManager(void)
 	towers = idList<Tower*>();
 
 	// Register Tower Definitions
+	Register(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 0, 0, 0));
+	Register(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 0, 0, 0));
 	Register(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0));
 }
 
@@ -172,8 +186,9 @@ void TowerManager::ToggleBuild(void)
 
 void TowerManager::BuildTower(idVec3 origin)
 {
-	if (buildTower == "tower") return;
+	if (!buildTower) return;
 
+	gameLocal.Printf("Building tower: %s\n", buildTower->name.c_str());
 	Tower* tower = new Tower(gameLocal.GetLocalPlayer(), buildTower);
 	tower->Init(origin);
 }
