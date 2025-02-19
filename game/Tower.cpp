@@ -124,6 +124,9 @@ TowerManager::TowerManager(void)
 	Register(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 0, 0, 0));
 	Register(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 0, 0, 0));
 	Register(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0));
+
+	// Economy Towers
+	Register(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(100, 0, 0), 0, 0, 0));
 }
 
 TowerManager::~TowerManager(void)
