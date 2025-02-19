@@ -4,64 +4,14 @@
 #include "Tower.h"
 #include "Game_local.h"
 
-TowerManager::TowerManager(void)
-{
-	gameLocal.Printf("Tower manager created...\n");
+Tower::Tower(idPlayer* owner, idStr tower)  
+{  
+   this->owner = owner;  
+   this->tower = tower;  
+   init = false;  
+   towerEntity = nullptr;  
 
-	buildMode = false;
-	buildTower = "tower";
-
-	lastWaveStart = -1;
-	lastWaveEnd = -1;
-	waveDelay = 1 * 60 * 10 ^ 3;
-}
-
-TowerManager::~TowerManager(void)
-{
-}
-
-void TowerManager::Init(void)
-{
-	gameLocal.Printf("Tower manager initialized...\n");
-}
-
-void TowerManager::Update(void)
-{
-	// Update Wave
-	if (!wave && gameLocal.GetTime() > (lastWaveEnd + waveDelay)) {
-		wave = new Wave();
-		wave->Init();
-	}
-
-	// Update Towers
-	for (int i = 0; i < towers.Num(); i++)
-	{
-		towers[i]->Update();
-	}
-}
-
-void TowerManager::AddTower(Tower*& tower)
-{
-	towers.Append(tower);
-}
-
-bool TowerManager::CanTowersShoot(void)
-{
-	if (wave) {
-		return wave->HasStarted() && !wave->HasEnded();
-	}
-
-	return false;
-}
-
-Tower::Tower(idPlayer* owner, idStr tower)
-{
-	this->owner = owner;
-	this->tower = tower;
-	init = false;
-	towerEntity = nullptr;
-
-	gameLocal.towerManager->AddTower(this);
+   gameLocal.towerManager->AddTower(this);  
 }
 
 Tower::~Tower(void)
@@ -142,4 +92,91 @@ void Tower::ForceShoot(void)
 	// TODO: shoot logic
 }
 
+TowerManager::TowerManager(void)
+{
+	gameLocal.Printf("Tower manager created...\n");
 
+	buildMode = false;
+	buildTower = "tower";
+
+	lastWaveStart = -1;
+	lastWaveEnd = -1;
+	waveDelay = 1 * 60 * 10 ^ 3;
+}
+
+TowerManager::~TowerManager(void)
+{
+}
+
+void TowerManager::Init(void)
+{
+	gameLocal.Printf("Tower manager initialized...\n");
+}
+
+void TowerManager::Update(void)
+{
+	// Update Wave
+	if (!wave && gameLocal.GetTime() > (lastWaveEnd + waveDelay)) {
+		wave = new Wave();
+		wave->Init();
+	}
+
+	// Update Towers
+	for (int i = 0; i < towers.Num(); i++)
+	{
+		towers[i]->Update();
+	}
+}
+
+void TowerManager::AddTower(Tower* tower)
+{
+	towers.Append(tower);
+}
+
+bool TowerManager::CanTowersShoot(void)
+{
+	if (wave) {
+		return wave->HasStarted() && !wave->HasEnded();
+	}
+
+	return false;
+}
+
+void TowerManager::ToggleBuild(void)
+{
+	buildMode = !buildMode;
+}
+
+void TowerManager::BuildTower(idVec3 origin)
+{
+	if (buildTower == "tower") return;
+
+	Tower* tower = new Tower(gameLocal.GetLocalPlayer(), buildTower);
+	tower->Init(origin);
+}
+
+Wave::Wave(void)
+{
+}
+
+Wave::~Wave(void)
+{
+}
+
+void Wave::Init(void)
+{
+}
+
+void Wave::Update(void)
+{
+}
+
+bool Wave::HasStarted(void)
+{
+	return false;
+}
+
+bool Wave::HasEnded(void)
+{
+	return false;
+}

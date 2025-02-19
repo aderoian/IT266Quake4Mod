@@ -16,29 +16,6 @@ public:
 
 };
 
-class TowerManager {
-public:
-	bool buildMode;
-	char* buildTower;
-
-public:
-	TowerManager(void);
-	~TowerManager(void);
-
-	void Init(void);
-	void Update(void);
-	void AddTower(Tower* &tower);
-	bool CanTowersShoot(void);
-
-private:
-	idList<Tower*> towers;
-	Wave* wave;
-
-	int lastWaveStart;
-	int lastWaveEnd;
-	int waveDelay;
-};
-
 class Tower {
 
 public:
@@ -64,6 +41,32 @@ private:
 
 private:
 	void SpawnTower();
+};
+
+class TowerManager {
+public:
+	bool buildMode;
+	const char* buildTower;
+
+public:
+	TowerManager(void);
+	~TowerManager(void);
+
+	void Init(void);
+	void Update(void);
+	void AddTower(Tower* tower);
+	bool CanTowersShoot(void);
+
+	void ToggleBuild(void);
+	void BuildTower(idVec3 origin);
+
+private:
+	idList<Tower*> towers;
+	Wave* wave;
+
+	int lastWaveStart;
+	int lastWaveEnd;
+	int waveDelay;
 };
 
 #endif // __TOWER_H__

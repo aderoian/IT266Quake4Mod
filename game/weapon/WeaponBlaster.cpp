@@ -18,12 +18,14 @@ public:
 	void				Restore				( idRestoreGame *savefile );
 	void				PreSave		( void );
 	void				PostSave	( void );
+	virtual void Attack(bool altAttack, int num_attacks, float spread, float fuseOffset, float power);
 
 protected:
 
 	bool				UpdateAttack		( void );
 	bool				UpdateFlashlight	( void );
 	void				Flashlight			( bool on );
+	idVec3				Tower_Raycast(const idDict& dict, const idVec3& muzzleOrigin, const idMat3& muzzleAxis, int num_hitscans, float spread, float power);
 
 private:
 
@@ -84,6 +86,40 @@ void rvWeaponBlaster::Flashlight ( bool on ) {
 		worldModel->HideSurface ( "models/weapons/blaster/flare" );
 		viewModel->HideSurface ( "models/weapons/blaster/flare" );
 	}
+}
+
+idVec3 rvWeaponBlaster::Tower_Raycast(const idDict& dict, const idVec3& muzzleOrigin, const idMat3& muzzleAxis, int num_hitscans, float spread, float power)
+{
+	if (!gameLocal.towerManager->buildMode) return idVec3(0, 0, 0);
+
+	idVec3  fxOrigin;
+	idMat3  fxAxis;
+	int		i;
+	float	ang;
+	float	spin;
+	idVec3	dir;
+	int		areas[2];
+
+	idBitMsg	msg;
+	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
+
+	GetGlobalJointTransform(true, flashJointView, fxOrigin, fxAxis, dict.GetVector("fxOriginOffset"));
+
+	float spreadRad = DEG2RAD(spread);
+	idVec3 end;
+	ang = idMath::Sin(spreadRad * gameLocal.random.RandomFloat());
+	spin = (float)DEG2RAD(360.0f) * gameLocal.random.RandomFloat();
+	//RAVEN BEGIN
+	//asalmon: xbox must use the muzzleAxis so the aim can be adjusted for aim assistance
+#ifdef _XBOX
+	dir = muzzleAxis[0] + muzzleAxis[2] * (ang * idMath::Sin(spin)) - muzzleAxis[1] * (ang * idMath::Cos(spin));
+#else
+	dir = playerViewAxis[0] + playerViewAxis[2] * (ang * idMath::Sin(spin)) - playerViewAxis[1] * (ang * idMath::Cos(spin));
+#endif
+	//RAVEN END
+	dir.Normalize();
+
+	return gameLocal.Raycast(dict, muzzleOrigin, dir, fxOrigin, owner, false, 1.0f, NULL, areas);
 }
 
 /*
@@ -431,7 +467,7 @@ stateResult_t rvWeaponBlaster::State_Fire ( const stateParms_t& parms ) {
 				PlayEffect ( "fx_chargedflash", barrelJointView, false );
 				PlayAnim( ANIMCHANNEL_ALL, "chargedfire", parms.blendFrames );
 			} else {
-				Attack ( false, 100, 10.0f, 0, 1.0f );
+				Attack ( false, 1, spread, 0, 1.0f );
 				PlayEffect ( "fx_normalflash", barrelJointView, false );
 				PlayAnim( ANIMCHANNEL_ALL, "fire", parms.blendFrames );
 			}
@@ -484,4 +520,115 @@ stateResult_t rvWeaponBlaster::State_Flashlight ( const stateParms_t& parms ) {
 			return SRESULT_DONE;
 	}
 	return SRESULT_ERROR;
+}
+
+void rvWeaponBlaster::Attack(bool altAttack, int num_attacks, float spread, float fuseOffset, float power) {
+	idVec3 muzzleOrigin;
+	idMat3 muzzleAxis;
+
+	if (!viewModel) {
+		common->Warning("NULL viewmodel %s\n", __FUNCTION__);
+		return;
+	}
+
+	if (viewModel->IsHidden()) {
+		return;
+	}
+
+	// avoid all ammo considerations on an MP client
+	if (!gameLocal.isClient) {
+		// check if we're out of ammo or the clip is empty
+		int ammoAvail = owner->inventory.HasAmmo(ammoType, ammoRequired);
+		if (!ammoAvail || ((clipSize != 0) && (ammoClip <= 0))) {
+			return;
+		}
+
+		owner->inventory.UseAmmo(ammoType, ammoRequired);
+		if (clipSize && ammoRequired) {
+			clipPredictTime = gameLocal.time;	// mp client: we predict this. mark time so we're not confused by snapshots
+			ammoClip -= 1;
+		}
+
+		// wake up nearby monsters
+		if (!wfl.silent_fire) {
+			gameLocal.AlertAI(owner);
+		}
+	}
+
+	// set the shader parm to the time of last projectile firing,
+	// which the gun material shaders can reference for single shot barrel glows, etc
+	viewModel->SetShaderParm(SHADERPARM_DIVERSITY, gameLocal.random.CRandomFloat());
+	viewModel->SetShaderParm(SHADERPARM_TIMEOFFSET, -MS2SEC(gameLocal.realClientTime));
+
+	if (worldModel.GetEntity()) {
+		worldModel->SetShaderParm(SHADERPARM_DIVERSITY, viewModel->GetRenderEntity()->shaderParms[SHADERPARM_DIVERSITY]);
+		worldModel->SetShaderParm(SHADERPARM_TIMEOFFSET, viewModel->GetRenderEntity()->shaderParms[SHADERPARM_TIMEOFFSET]);
+	}
+
+	// calculate the muzzle position
+	if (barrelJointView != INVALID_JOINT && spawnArgs.GetBool("launchFromBarrel")) {
+		// there is an explicit joint for the muzzle
+		GetGlobalJointTransform(true, barrelJointView, muzzleOrigin, muzzleAxis);
+	}
+	else {
+		// go straight out of the view
+		muzzleOrigin = playerViewOrigin;
+		muzzleAxis = playerViewAxis;
+		muzzleOrigin += playerViewAxis[0] * muzzleOffset;
+	}
+
+	// add some to the kick time, incrementally moving repeat firing weapons back
+	if (kick_endtime < gameLocal.realClientTime) {
+		kick_endtime = gameLocal.realClientTime;
+	}
+	kick_endtime += muzzle_kick_time;
+	if (kick_endtime > gameLocal.realClientTime + muzzle_kick_maxtime) {
+		kick_endtime = gameLocal.realClientTime + muzzle_kick_maxtime;
+	}
+
+	// add the muzzleflash
+	MuzzleFlash();
+
+	// quad damage overlays a sound
+	if (owner->PowerUpActive(POWERUP_QUADDAMAGE)) {
+		viewModel->StartSound("snd_quaddamage", SND_CHANNEL_VOICE, 0, false, NULL);
+	}
+
+	// Muzzle flash effect
+	bool muzzleTint = spawnArgs.GetBool("muzzleTint");
+	viewModel->PlayEffect("fx_muzzleflash", flashJointView, false, vec3_origin, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one);
+
+	if (worldModel && flashJointWorld != INVALID_JOINT) {
+		worldModel->PlayEffect(gameLocal.GetEffect(weaponDef->dict, "fx_muzzleflash_world"), flashJointWorld, vec3_origin, mat3_identity, false, vec3_origin, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one);
+	}
+
+	owner->WeaponFireFeedback(&weaponDef->dict);
+
+	// Inform the gui of the ammo change
+	viewModel->PostGUIEvent("weapon_ammo");
+	if (ammoClip == 0 && AmmoAvailable() == 0) {
+		viewModel->PostGUIEvent("weapon_noammo");
+	}
+
+	if (gameLocal.towerManager->buildMode) {
+		idVec3 hitPos = Tower_Raycast(altAttack ? attackAltDict : attackDict, muzzleOrigin, muzzleAxis, num_attacks, spread, power);
+
+		gameLocal.towerManager->BuildTower(hitPos);
+		return;
+	}
+
+	// The attack is either a hitscan or a launched projectile, do that now.
+	if (!gameLocal.isClient) {
+		idDict& dict = altAttack ? attackAltDict : attackDict;
+		power *= owner->PowerUpModifier(PMOD_PROJECTILE_DAMAGE);
+		if (altAttack ? wfl.attackAltHitscan : wfl.attackHitscan) {
+			Hitscan(dict, muzzleOrigin, muzzleAxis, num_attacks, spread, power);
+		}
+		else {
+			LaunchProjectiles(dict, muzzleOrigin, muzzleAxis, num_attacks, spread, fuseOffset, power);
+		}
+		//asalmon:  changed to keep stats even in single player 
+		statManager->WeaponFired(owner, weaponIndex, num_attacks);
+
+	}
 }

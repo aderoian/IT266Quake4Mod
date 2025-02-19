@@ -7833,6 +7833,154 @@ idEntity* idGameLocal::HitScan(
 	return NULL;
 }
 
+idVec3 idGameLocal::Raycast(
+	const idDict& hitscanDict,
+	const idVec3& origOrigin,
+	const idVec3& origDir,
+	const idVec3& origFxOrigin,
+	idEntity* owner,
+	bool			noFX,
+	float			damageScale,
+	// twhitaker: added additionalIgnore parameter
+	idEntity* additionalIgnore,
+	int				areas[2]
+) {
+
+	idVec3		dir;
+	idVec3		origin;
+	idVec3		fxOrigin;
+	idVec3		fxDir;
+	idVec3		impulse;
+	idVec4		hitscanTint(1.0f, 1.0f, 1.0f, 1.0f);
+	int			reflect;
+	float		tracerChance;
+	idEntity* ignore;
+	float		penetrate;
+
+	if (areas) {
+		areas[0] = pvs.GetPVSArea(origFxOrigin);
+		areas[1] = -1;
+	}
+
+	ignore = owner;
+	penetrate = hitscanDict.GetFloat("penetrate");
+
+	if (hitscanDict.GetBool("hitscanTint") && owner->IsType(idPlayer::GetClassType())) {
+		hitscanTint = ((idPlayer*)owner)->GetHitscanTint();
+	}
+
+	// twhitaker: additionalIgnore parameter
+	if (!additionalIgnore) {
+		additionalIgnore = ignore;
+	}
+
+	origin = origOrigin;
+	fxOrigin = origFxOrigin;
+	dir = origDir;
+	tracerChance = ((g_perfTest_weaponNoFX.GetBool()) ? 0 : hitscanDict.GetFloat("tracerchance", "0"));
+
+	// Apply player powerups
+	if (owner && owner->IsType(idPlayer::GetClassType())) {
+		damageScale *= static_cast<idPlayer*>(owner)->PowerUpModifier(PMOD_PROJECTILE_DAMAGE);
+	}
+
+	// Run reflections
+	for (reflect = hitscanDict.GetFloat("reflect", "0"); reflect >= 0; reflect--) {
+		idVec3		start;
+		idVec3		end;
+		idEntity* ent;
+		idEntity* actualHitEnt;
+		trace_t		tr;
+		int			contents;
+		int			collisionArea;
+		idVec3		collisionPoint;
+		bool		tracer;
+
+		// Calculate the end point of the trace
+		start = origin;
+		if (g_perfTest_hitscanShort.GetBool()) {
+			end = start + (dir.ToMat3() * idVec3(idMath::ClampFloat(0, 2048, hitscanDict.GetFloat("range", "2048")), 0, 0));
+		}
+		else {
+			end = start + (dir.ToMat3() * idVec3(hitscanDict.GetFloat("range", "40000"), 0, 0));
+		}
+		if (g_perfTest_hitscanBBox.GetBool()) {
+			contents = MASK_SHOT_BOUNDINGBOX | CONTENTS_PROJECTILE;
+		}
+		else {
+			contents = MASK_SHOT_RENDERMODEL | CONTENTS_WATER | CONTENTS_PROJECTILE;
+		}
+
+		// Loop the traces to handle cases where something can be shot through
+		while (1) {
+			// Trace to see if we hit any entities
+// RAVEN BEGIN
+// ddynerman: multiple clip worlds
+			if (hitscanDict.GetFloat("trace_size", "0") > 0.0f)
+			{
+				float range = hitscanDict.GetFloat("range", "1024");
+				if (range > 4096.0f)
+				{
+					assert(!(range > 4096.0f));
+					Warning("idGameLocal::HitScan: hitscan def (%s) with trace_size must have max range of 4096!", hitscanDict.GetString("classname"));
+					range = idMath::ClampFloat(0.0f, 4096.0f, range);
+				}
+				end = start + (dir * range);
+
+				idBounds traceBounds;
+				traceBounds.Zero();
+				traceBounds.ExpandSelf(hitscanDict.GetFloat("trace_size", "0"));
+				// twhitaker: additionalIgnore parameter
+				TraceBounds(owner, tr, start, end, traceBounds, contents, additionalIgnore);
+			}
+			else
+			{
+				// twhitaker: additionalIgnore parameter
+				TracePoint(owner, tr, start, end, contents, additionalIgnore);
+			}
+			//gameRenderWorld->DebugArrow( colorRed, start, end, 10, 5000 );
+// RAVEN END
+
+			// If the hitscan hit a no impact surface we can just return out
+			//assert( tr.c.material );
+			if (tr.fraction >= 1.0f || (tr.c.material && tr.c.material->GetSurfaceFlags() & SURF_NOIMPACT)) {
+				PlayEffect(hitscanDict, "fx_path", fxOrigin, dir.ToMat3(), false, tr.endpos, false, EC_IGNORE, hitscanTint);
+				if (random.RandomFloat() < tracerChance) {
+					PlayEffect(hitscanDict, "fx_tracer", fxOrigin, dir.ToMat3(), false, tr.endpos);
+					tracer = true;
+				}
+				else {
+					tracer = false;
+				}
+
+				if (areas) {
+					collisionArea = pvs.GetPVSArea(tr.endpos);
+					if (collisionArea != areas[0]) {
+						areas[1] = collisionArea;
+					}
+				}
+
+				return idVec3(0, 0, 0);
+			}
+
+			// computing the collisionArea from the collisionPoint fails sometimes
+			if (areas) {
+				collisionArea = pvs.GetPVSArea(tr.c.point);
+				if (collisionArea != areas[0]) {
+					areas[1] = collisionArea;
+				}
+			}
+			return tr.c.point - (tr.c.normal * tr.c.point - tr.c.dist) * tr.c.normal;
+		}
+
+		assert(false);
+
+		return idVec3(0, 0, 0);
+	}
+
+	return idVec3(0, 0, 0);
+}
+
 /*
 ===================
 idGameLocal::RegisterClientEntity

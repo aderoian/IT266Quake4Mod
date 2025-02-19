@@ -3066,7 +3066,31 @@ void Cmd_CreateTower_f(const idCmdArgs& args) {
 	idStr towerType = args.Argv(1);
 	Tower tower = Tower(player, towerType);
 	tower.Init(player->firstPersonViewOrigin);
-	tower.SpawnTower();
+}
+
+void Cmd_ToggleBuild_f(const idCmdArgs& args) {
+	TowerManager* towerManager = gameLocal.towerManager;
+	if (!towerManager) {
+		return;
+	}
+
+	towerManager->ToggleBuild();
+	gameLocal.Printf("Tower build mode has been toggled to %s\n", towerManager->buildMode ? "true" : "false");
+}
+
+void Cmd_BuildTower_f(const idCmdArgs& args) {
+	TowerManager* towerManager = gameLocal.towerManager;
+	if (!towerManager) {
+		return;
+	}
+
+	if (args.Argc() < 2) {
+		gameLocal.Printf("Usage: buildTower <towerType>\n");
+		return;
+	}
+
+	towerManager->buildTower = args.Argv(1);
+	gameLocal.Printf("Tower build type has been set to %s\n", towerManager->buildTower);
 }
 // MOD END
 
@@ -3270,6 +3294,8 @@ void idGameLocal::InitConsoleCommands( void ) {
 // MOD BEGIN
 	cmdSystem->AddCommand("startgame", Cmd_StartGame_f, CMD_FL_GAME | CMD_FL_CHEAT, "starts the game");
 	cmdSystem->AddCommand("createtower", Cmd_CreateTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a tower");
+	cmdSystem->AddCommand("togglebuild", Cmd_ToggleBuild_f, CMD_FL_GAME | CMD_FL_CHEAT, "toggles build mode");
+	cmdSystem->AddCommand("buildtower", Cmd_BuildTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "sets the build tower type");
 // MOD END
 }
 
