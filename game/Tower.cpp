@@ -11,7 +11,7 @@ Tower::Tower(idPlayer* owner, idStr tower)
    init = false;  
    towerEntity = nullptr;  
 
-   gameLocal.towerManager->AddTower(this);  
+   id = gameLocal.towerManager->AddTower(this);  
 }
 
 Tower::~Tower(void)
@@ -96,21 +96,43 @@ TowerManager::TowerManager(void)
 {
 	gameLocal.Printf("Tower manager created...\n");
 
+	towerId = 0;
+
 	buildMode = false;
 	buildTower = "tower";
 
 	lastWaveStart = -1;
 	lastWaveEnd = -1;
 	waveDelay = 1 * 60 * 10 ^ 3;
+
+	towerDefinitions = TowerDefList();
+	towers = idList<Tower*>();
+
+	// Register Tower Definitions
+	Register(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0));
 }
 
 TowerManager::~TowerManager(void)
 {
+	gameLocal.Printf("Tower manager destroyed...\n");
+	for (int i = 0; i < towers.Num(); i++)
+	{
+		delete towers[i];
+	}
+	towers.Clear();
+	delete wave;
+
+	delete& towerDefinitions;
 }
 
 void TowerManager::Init(void)
 {
 	gameLocal.Printf("Tower manager initialized...\n");
+}
+
+void TowerManager::Register(TowerDef* def)
+{
+	towerDefinitions.AddDef(def);
 }
 
 void TowerManager::Update(void)
@@ -128,9 +150,10 @@ void TowerManager::Update(void)
 	}
 }
 
-void TowerManager::AddTower(Tower* tower)
+int TowerManager::AddTower(Tower* tower)
 {
 	towers.Append(tower);
+	return towerId++;
 }
 
 bool TowerManager::CanTowersShoot(void)
@@ -153,6 +176,17 @@ void TowerManager::BuildTower(idVec3 origin)
 
 	Tower* tower = new Tower(gameLocal.GetLocalPlayer(), buildTower);
 	tower->Init(origin);
+}
+
+void TowerManager::ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback)(const char* s)) {
+	int i;
+
+	auto towerManager = gameLocal.towerManager;
+	for (i = 0; i < towerManager->towerDefinitions.Num(); i++) {
+		if (towerManager->towerDefinitions[i]) {
+			callback(va("%s %s", args.Argv(0), towerManager->towerDefinitions[i]->name.c_str()));
+		}
+	}
 }
 
 Wave::Wave(void)
@@ -179,4 +213,40 @@ bool Wave::HasStarted(void)
 bool Wave::HasEnded(void)
 {
 	return false;
+}
+
+TowerDefList::TowerDefList(void)
+{
+	towerDefs = idList<TowerDef*>();
+	keyMap = idDict();
+}
+
+TowerDefList::~TowerDefList(void)
+{
+	for (int i = 0; i < towerDefs.Num(); i++)
+	{
+		delete towerDefs[i];
+	}
+
+	towerDefs.Clear();
+	keyMap.Clear();
+}
+
+void TowerDefList::AddDef(TowerDef* def)
+{
+	int index = towerDefs.Append(def);
+	keyMap.SetInt(def->name, index);
+}
+
+int TowerDefList::Num()
+{
+	return towerDefs.Num();
+}
+
+TowerDef* TowerDefList::GetDef(const char* name)
+{
+	int index = keyMap.GetInt(name, "-1");
+	if (index == -1) return nullptr;
+
+	return towerDefs[index];
 }

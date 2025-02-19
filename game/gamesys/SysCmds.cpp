@@ -3295,7 +3295,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("startgame", Cmd_StartGame_f, CMD_FL_GAME | CMD_FL_CHEAT, "starts the game");
 	cmdSystem->AddCommand("createtower", Cmd_CreateTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a tower");
 	cmdSystem->AddCommand("togglebuild", Cmd_ToggleBuild_f, CMD_FL_GAME | CMD_FL_CHEAT, "toggles build mode");
-	cmdSystem->AddCommand("buildtower", Cmd_BuildTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "sets the build tower type");
+	cmdSystem->AddCommand("buildtower", Cmd_BuildTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "sets the build tower type", TowerManager::ArgCompletion_TowerDefs);
 // MOD END
 }
 
