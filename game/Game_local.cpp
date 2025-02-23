@@ -3748,6 +3748,8 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		skipCinematic = false;		
 	}
 
+	towerManager->Update();
+
 	// show any debug info for this frame
 	RunDebugInfo();
 	D_DrawDebugLines();

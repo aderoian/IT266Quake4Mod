@@ -3064,8 +3064,8 @@ void Cmd_CreateTower_f(const idCmdArgs& args) {
 		return;
 	}
 	auto towerDef = gameLocal.towerManager->towerDefinitions[args.Argv(1)];
-	Tower tower = Tower(player, towerDef);
-	tower.Init(player->firstPersonViewOrigin);
+	Tower* tower = new Tower(player, towerDef);
+	tower->Init(player->firstPersonViewOrigin);
 }
 
 void Cmd_ToggleBuild_f(const idCmdArgs& args) {
@@ -3107,6 +3107,60 @@ void Cmd_TowerDefs_f(const idCmdArgs& args) {
 		auto towerDef = towerManager->towerDefinitions[i];
 		gameLocal.Printf("Tower %d: %s\n", i, towerDef->name.c_str());
 	}
+}
+
+void Cmd_ListResources_f(const idCmdArgs& args) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if (!player) {
+		return;
+	}
+
+	gameLocal.Printf("====== Resources =====\n\n");
+	gameLocal.Printf("Gold: %d\n", player->inventory.gold);
+	gameLocal.Printf("Wood: %d\n", player->inventory.wood);
+	gameLocal.Printf("Stone: %d\n", player->inventory.stone);
+	gameLocal.Printf("Energy: %d\n", player->inventory.energy);
+	gameLocal.Printf("Builder: %d\n", player->inventory.builder);
+}
+
+void Cmd_ListTowers_f(const idCmdArgs& args) {
+	TowerManager* towerManager = gameLocal.towerManager;
+	if (!towerManager) {
+		return;
+	}
+
+	gameLocal.Printf("====== Towers =====\n\n");
+	for (int i = 0; i < towerManager->towers.Num(); i++) {
+		auto tower = towerManager->towers[i];
+		gameLocal.Printf("Tower %d: %s\n", i, tower->towerDef->name.c_str());
+	}
+}
+
+void Cmd_ShootTower_f(const idCmdArgs& args) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if (!player) {
+		return;
+	}
+	TowerManager* towerManager = gameLocal.towerManager;
+	if (!towerManager) {
+		return;
+	}
+
+	if (args.Argc() < 2) {
+		for (int i = 0; i < towerManager->towers.Num(); i++) {
+			auto tower = towerManager->towers[i];
+			tower->ForceShoot();
+		}
+
+		return;
+	}
+	int towerIndex = atoi(args.Argv(1));
+	if (towerIndex < 0 || towerIndex >= towerManager->towers.Num()) {
+		gameLocal.Printf("Invalid tower index\n");
+		return;
+	}
+	auto tower = towerManager->towers[towerIndex];
+	tower->ForceShoot();
 }
 // MOD END
 
@@ -3313,6 +3367,10 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("togglebuild", Cmd_ToggleBuild_f, CMD_FL_GAME | CMD_FL_CHEAT, "toggles build mode");
 	cmdSystem->AddCommand("buildtower", Cmd_BuildTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "sets the build tower type", TowerManager::ArgCompletion_TowerDefs);
 	cmdSystem->AddCommand("towerdefs", Cmd_TowerDefs_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists tower definitions");
+	cmdSystem->AddCommand("listresources", Cmd_ListResources_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists player resources");
+	cmdSystem->AddCommand("listtowers", Cmd_ListTowers_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists player towers");
+	cmdSystem->AddCommand("shoottower", Cmd_ShootTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "forces a tower to shoot");
+	
 // MOD END
 }
 

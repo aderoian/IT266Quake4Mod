@@ -265,6 +265,20 @@ public:
 //	idList<rvDatabaseEntry>	database;
 	
 	int						secretAreasDiscovered;
+
+	// MODDED BEGIN
+	int gold;
+	int energy;
+	int stone;
+	int wood;
+	int builder;
+
+	bool ProcessTransaction(ResourceCost cost);
+	bool ProcessEnergyTransaction(int cost);
+	bool ProcessBuilderTransaction(int cost);
+
+
+	// MODDED END
 };
 
 class idPlayer : public idActor {

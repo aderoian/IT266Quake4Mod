@@ -234,6 +234,14 @@ void idInventory::Clear( void ) {
 	memset( ammoIndices, -1, sizeof( int ) * MAX_WEAPONS );
 	memset( startingAmmo, -1, sizeof( int ) * MAX_WEAPONS );
 	memset( ammoRegenTime, -1, sizeof( int ) * MAX_WEAPONS );
+
+	// MODDED BEGIN
+	gold = 0;
+	energy = 0;
+	stone = 0;
+	wood = 0;
+	builder = 0;
+	// MODDED END
 }
 
 /*
@@ -1050,6 +1058,36 @@ int idInventory::HasAmmo( const char *weapon_classname ) {
 	int index;
 	index = AmmoIndexForWeaponClass( weapon_classname, &ammoRequired );
 	return HasAmmo( index, ammoRequired );
+}
+
+bool idInventory::ProcessTransaction(ResourceCost cost)
+{
+	if (cost.gold <= gold && cost.stone <= stone && cost.wood <= wood) {
+		gold -= cost.gold;
+		stone -= cost.stone;
+		wood -= cost.wood;
+		return true;
+	}
+
+	return false;
+}
+
+bool idInventory::ProcessEnergyTransaction(int cost)
+{
+	if (cost <= energy) {
+		energy -= cost;
+		return true;
+	}
+	return false;
+}
+
+bool idInventory::ProcessBuilderTransaction(int cost)
+{
+	if (cost <= builder) {
+		builder -= cost;
+		return true;
+	}
+	return false;
 }
 
 /*
@@ -3435,6 +3473,30 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 	if ( weapon ) {
 		UpdateHudAmmo( _hud );
 	}
+
+	// MOD BEGIN
+	temp = _hud->State().GetInt("player_gold", "-1");
+	if (temp != inventory.gold) {
+		_hud->SetStateInt("player_gold", inventory.gold);
+	}
+	temp = _hud->State().GetInt("player_stone", "-1");
+	if (temp != inventory.stone) {
+		_hud->SetStateInt("player_stone", inventory.stone);
+	}
+	temp = _hud->State().GetInt("player_wood", "-1");
+	if (temp != inventory.wood) {
+		_hud->SetStateInt("player_wood", inventory.wood);
+	}
+	temp = _hud->State().GetInt("player_energy", "-1");
+	if (temp != inventory.energy) {
+		_hud->SetStateInt("player_energy", inventory.energy);
+	}
+	temp = _hud->State().GetInt("player_builder", "-1");
+	if (temp != inventory.builder) {
+		_hud->SetStateInt("player_builder", inventory.builder);
+	}
+
+	// MOD END
 	
 	_hud->StateChanged( gameLocal.time );
 }

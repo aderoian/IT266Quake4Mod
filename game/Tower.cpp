@@ -7,7 +7,7 @@
 Tower::Tower(idPlayer* owner, const TowerDef* tower)  
 {  
    this->owner = owner;  
-   this->tower = tower;  
+   this->towerDef = tower;  
    init = false;  
    towerEntity = nullptr;  
 
@@ -42,7 +42,7 @@ void Tower::SpawnTower()
 
 	yaw = owner->viewAngles.yaw;
 
-	if (!tower) {
+	if (!towerDef) {
 		gameLocal.Printf("failed to spawn tower: no tower definition\n");
 		return;
 	}
@@ -51,7 +51,7 @@ void Tower::SpawnTower()
 	dict.Set("angle", va("%f", yaw + 180));
 
 	dict.Set("origin", origin.ToString());
-	dict.Set("model", tower->model.c_str());
+	dict.Set("model", towerDef->model.c_str());
 
 	idEntity* newEnt = NULL;
 	gameLocal.SpawnEntityDef(dict, &newEnt);
@@ -81,6 +81,16 @@ idVec3 Tower::GetOrigin(void)
 	return origin;
 }
 
+int Tower::GetDamage(void)
+{
+	return towerDef->damage;
+}
+
+int Tower::GetRange(void)
+{
+	return towerDef->range;
+}
+
 bool Tower::CanShoot(void)
 {
 	return gameLocal.towerManager->CanTowersShoot();
@@ -94,7 +104,7 @@ void Tower::Shoot(void)
 
 void Tower::ForceShoot(void)
 {
-	TowerShootFunc_t shootFunc = tower->shootFunc;
+	TowerShootFunc_t shootFunc = towerDef->shootFunc;
 	if (shootFunc) {
 		shootFunc(this);
 	}
@@ -102,6 +112,7 @@ void Tower::ForceShoot(void)
 
 void Tower::ShootDarkMatter(Tower* tower)
 {
+
 }
 
 void Tower::ShootGauntlet(Tower* tower)
@@ -142,22 +153,28 @@ void Tower::ShootRocketLauncher(Tower* tower)
 
 void Tower::GenerateGold(Tower* tower)
 {
+	gameLocal.Printf("Generating gold...\n");
+	tower->owner->inventory.gold += tower->GetDamage();
 }
 
 void Tower::GenerateEnergy(Tower* tower)
 {
+	tower->owner->inventory.energy += tower->GetDamage();
 }
 
 void Tower::GenerateStone(Tower* tower)
 {
+	tower->owner->inventory.stone += tower->GetDamage();
 }
 
 void Tower::GenerateWood(Tower* tower)
 {
+	tower->owner->inventory.wood += tower->GetDamage();
 }
 
 void Tower::GenerateBuilder(Tower* tower)
 {
+	tower->owner->inventory.builder += tower->GetDamage();
 }
 
 TowerManager::TowerManager(void)
@@ -189,11 +206,11 @@ TowerManager::TowerManager(void)
 	Register(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootRocketLauncher));
 
 	// Economy Towers
-	Register(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateGold));
-	Register(new TowerDef("energy_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateEnergy));
-	Register(new TowerDef("stone_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateStone));
-	Register(new TowerDef("wood_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateWood));
-	Register(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 0, 0, 0, Tower::GenerateBuilder));
+	Register(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateGold));
+	Register(new TowerDef("energy_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateEnergy));
+	Register(new TowerDef("stone_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateStone));
+	Register(new TowerDef("wood_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateWood));
+	Register(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateBuilder));
 }
 
 TowerManager::~TowerManager(void)

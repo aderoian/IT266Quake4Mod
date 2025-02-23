@@ -50,6 +50,10 @@ struct TowerUpgrade {
 	}
 };
 
+class Tower;
+
+typedef void (*TowerShootFunc_t)(Tower* tower);
+
 struct TowerDef {
 	idStr name;
 	idStr model;
@@ -107,6 +111,8 @@ class Tower {
 
 public:
 	int id;
+	idPlayer* owner;
+	const TowerDef* towerDef;
 
 public:
 	Tower(idPlayer* owner, const TowerDef* tower);
@@ -114,6 +120,8 @@ public:
 	void Init(idVec3 origin);
 	void Update(void);
 	idVec3 GetOrigin(void);
+	int GetDamage(void);
+	int GetRange(void);
 
 	bool CanShoot(void);
 	void Shoot(void);
@@ -136,8 +144,6 @@ public:
 	static void GenerateBuilder(Tower* tower);
 
 private:
-	idPlayer* owner;
-	const TowerDef* tower;
 	idVec3 origin;
 	idEntity* towerEntity;
 
@@ -149,8 +155,6 @@ private:
 	void SpawnTower();
 };
 
-typedef void (*TowerShootFunc_t)(Tower* tower);
-
 class TowerManager {
 public:
 	int towerId;
@@ -158,6 +162,9 @@ public:
 	bool buildMode;
 	const TowerDef* buildTower;
 	TowerDefList towerDefinitions;
+
+	idList<Tower*> towers;
+	Wave* wave;
 
 public:
 	TowerManager(void);
@@ -175,9 +182,6 @@ public:
 	static void ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback)(const char* s));
 
 private:
-	idList<Tower*> towers;
-	Wave* wave;
-
 	int lastWaveStart;
 	int lastWaveEnd;
 	int waveDelay;
