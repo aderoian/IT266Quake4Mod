@@ -3064,8 +3064,8 @@ void Cmd_CreateTower_f(const idCmdArgs& args) {
 		return;
 	}
 	auto towerDef = gameLocal.towerManager->towerDefinitions[args.Argv(1)];
-	Tower* tower = new Tower(player, towerDef);
-	tower->Init(player->firstPersonViewOrigin);
+	//Tower* tower = new Tower(player, towerDef);
+	//tower->Init(player->firstPersonViewOrigin);
 }
 
 void Cmd_ToggleBuild_f(const idCmdArgs& args) {
@@ -3132,7 +3132,7 @@ void Cmd_ListTowers_f(const idCmdArgs& args) {
 	gameLocal.Printf("====== Towers =====\n\n");
 	for (int i = 0; i < towerManager->towers.Num(); i++) {
 		auto tower = towerManager->towers[i];
-		gameLocal.Printf("Tower %d: %s\n", i, tower->towerDef->name.c_str());
+		gameLocal.Printf("Tower %d: %s | %s\n", i, tower->towerDef->name.c_str(), tower->origin->ToString());
 	}
 }
 
@@ -3161,6 +3161,29 @@ void Cmd_ShootTower_f(const idCmdArgs& args) {
 	}
 	auto tower = towerManager->towers[towerIndex];
 	tower->ForceShoot();
+}
+
+void Cmd_CreateWave_f(const idCmdArgs& args) {
+	TowerManager* towerManager = gameLocal.towerManager;
+	if (!towerManager) {
+		return;
+	}
+
+	if (args.Argc() < 3) {
+		gameLocal.Printf("Usage: createWave <numMonsters> <...monsterTypes>\n");
+		return;
+	}
+
+	idList<idStr> monsterTypes;
+	for (int i = 2; i < args.Argc(); i++) {
+		monsterTypes.Append(args.Argv(i));
+	}
+
+	Wave* wave = new Wave(atoi(args.Argv(1)), monsterTypes);
+	wave->Init();
+	towerManager->SetWave(wave);
+
+	gameLocal.Printf("Wave created with %d monsters\n", wave->startingMonsters);
 }
 // MOD END
 
@@ -3370,7 +3393,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("listresources", Cmd_ListResources_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists player resources");
 	cmdSystem->AddCommand("listtowers", Cmd_ListTowers_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists player towers");
 	cmdSystem->AddCommand("shoottower", Cmd_ShootTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "forces a tower to shoot");
-	
+	cmdSystem->AddCommand("createwave", Cmd_CreateWave_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a wave", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF>);
 // MOD END
 }
 

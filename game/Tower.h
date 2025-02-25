@@ -3,17 +3,21 @@
 
 class Wave {
 public:
-	Wave(void);
+	int startingMonsters;
+	int monstersLeft;
+public:
+	Wave(int startingMonsters, idList<idStr> monsterTypes);
 	~Wave(void);
 	void Init(void);
 	void Update(void);
 	bool HasStarted(void);
 	bool HasEnded(void);
 
-public:
-	int startingMonsters;
-	int monstersLeft;
+private:
+	idList<idStr> monsterTypes;
 
+private:
+	void SpawnMonster(idStr type, idVec3 origin);
 };
 
 struct ResourceCost {
@@ -113,13 +117,13 @@ public:
 	int id;
 	idPlayer* owner;
 	const TowerDef* towerDef;
+	idVec3* origin;
 
 public:
-	Tower(idPlayer* owner, const TowerDef* tower);
+	Tower(idPlayer* owner, const TowerDef* tower, idVec3* origin);
 	~Tower(void);
-	void Init(idVec3 origin);
+	//void Init(idVec3 origin, int id);
 	void Update(void);
-	idVec3 GetOrigin(void);
 	int GetDamage(void);
 	int GetRange(void);
 
@@ -144,7 +148,6 @@ public:
 	static void GenerateBuilder(Tower* tower);
 
 private:
-	idVec3 origin;
 	idEntity* towerEntity;
 
 	bool init;
@@ -166,6 +169,8 @@ public:
 	idList<Tower*> towers;
 	Wave* wave;
 
+	idVec3* center;
+
 public:
 	TowerManager(void);
 	~TowerManager(void);
@@ -173,11 +178,14 @@ public:
 	void Init(void);
 	void Register(TowerDef* def);
 	void Update(void);
-	int AddTower(Tower* tower);
+	void AddTower(Tower* tower);
 	bool CanTowersShoot(void);
 
 	void ToggleBuild(void);
 	void BuildTower(idVec3 origin);
+
+	void CalculateCenter(void);
+	void SetWave(Wave* wave);
 
 	static void ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback)(const char* s));
 

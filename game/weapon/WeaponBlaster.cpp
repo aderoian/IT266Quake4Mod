@@ -613,7 +613,7 @@ void rvWeaponBlaster::Attack(bool altAttack, int num_attacks, float spread, floa
 	if (gameLocal.towerManager->buildMode) {
 		idVec3 hitPos = Tower_Raycast(altAttack ? attackAltDict : attackDict, muzzleOrigin, muzzleAxis, num_attacks, spread, power);
 
-		gameLocal.towerManager->BuildTower(hitPos);
+		gameLocal.towerManager->BuildTower(hitPos + idVec3(0, 0, 10));
 		return;
 	}
 

@@ -4,33 +4,27 @@
 #include "Tower.h"
 #include "Game_local.h"
 
-Tower::Tower(idPlayer* owner, const TowerDef* tower)  
+Tower::Tower(idPlayer* owner, const TowerDef* tower, idVec3* origin)  
 {  
    this->owner = owner;  
    this->towerDef = tower;  
    init = false;  
-   towerEntity = nullptr;  
+   towerEntity = nullptr;
 
-   id = gameLocal.towerManager->AddTower(this);  
+   this->origin = origin;
+   id = gameLocal.towerManager->towerId++;
+   SpawnTower();
 }
 
 Tower::~Tower(void)
 {
 	gameLocal.Printf("Tower destroyed...\n");
 
-	if (towerEntity)
-		delete towerEntity;
+	if (origin) 
+		delete origin;
 
 	towerEntity = nullptr;
 	init = false;
-}
-
-void Tower::Init(idVec3 origin)
-{
-	this->origin = origin;
-	SpawnTower();
-
-	init = true;
 }
 
 void Tower::SpawnTower()
@@ -50,7 +44,7 @@ void Tower::SpawnTower()
 	dict.Set("classname", "player_animatedentity");
 	dict.Set("angle", va("%f", yaw + 180));
 
-	dict.Set("origin", origin.ToString());
+	dict.Set("origin", origin->ToString());
 	dict.Set("model", towerDef->model.c_str());
 
 	idEntity* newEnt = NULL;
@@ -74,11 +68,6 @@ void Tower::Update(void)
 
 	if (gameLocal.GetTime() % shootDelay == 0)
 		Shoot();
-}
-
-idVec3 Tower::GetOrigin(void)
-{
-	return origin;
 }
 
 int Tower::GetDamage(void)
@@ -193,6 +182,8 @@ TowerManager::TowerManager(void)
 	towerDefinitions = TowerDefList();
 	towers = idList<Tower*>();
 
+	center = new idVec3(0, 0, 0);
+
 	// Register Tower Definitions
 	Register(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(), 0, 0, 0, Tower::ShootDarkMatter));
 	Register(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 0, 0, 0, Tower::ShootGauntlet));
@@ -223,6 +214,7 @@ TowerManager::~TowerManager(void)
 	towers.Clear();
 	delete wave;
 
+	delete center;
 	delete& towerDefinitions;
 }
 
@@ -240,8 +232,8 @@ void TowerManager::Update(void)
 {
 	// Update Wave
 	if (!wave && gameLocal.GetTime() > (lastWaveEnd + waveDelay)) {
-		wave = new Wave();
-		wave->Init();
+		/*wave = new Wave();
+		wave->Init();*/
 	}
 
 	// Update Towers
@@ -251,10 +243,10 @@ void TowerManager::Update(void)
 	}
 }
 
-int TowerManager::AddTower(Tower* tower)
+void TowerManager::AddTower(Tower* tower)
 {
 	towers.Append(tower);
-	return towerId++;
+	CalculateCenter();
 }
 
 bool TowerManager::CanTowersShoot(void)
@@ -275,9 +267,33 @@ void TowerManager::BuildTower(idVec3 origin)
 {
 	if (!buildTower) return;
 
-	gameLocal.Printf("Building tower: %s\n", buildTower->name.c_str());
-	Tower* tower = new Tower(gameLocal.GetLocalPlayer(), buildTower);
-	tower->Init(origin);
+	idVec3* originPtr = new idVec3(origin);
+	gameLocal.Printf("Building tower '%s' at: '%s'\n", buildTower->name.c_str(), origin.ToString());
+	Tower* tower = new Tower(gameLocal.GetLocalPlayer(), buildTower, originPtr);
+	AddTower(tower);
+}
+
+void TowerManager::CalculateCenter(void)
+{
+	int x = 0, y = 0, z = 0;
+	for (int i = 0; i < towers.Num(); i++)
+	{
+		idVec3 origin = * towers[i]->origin;
+		x += origin.x;
+		y += origin.y;
+		z += origin.z;
+
+		gameLocal.Printf("%d %d %d", x, y, z);
+	}
+
+	delete center;
+	center = new idVec3(x / towers.Num(), y / towers.Num(), z / towers.Num());
+	gameLocal.Printf("Center: %s\n", center->ToString());
+}
+
+void TowerManager::SetWave(Wave* wave)
+{
+	this->wave = wave;
 }
 
 void TowerManager::ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback)(const char* s)) {
@@ -291,8 +307,11 @@ void TowerManager::ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback
 	}
 }
 
-Wave::Wave(void)
+Wave::Wave(int startingMonsters, idList<idStr> monsterTypes)
 {
+	this->startingMonsters = startingMonsters;
+	this->monstersLeft = startingMonsters;
+	this->monsterTypes = monsterTypes;
 }
 
 Wave::~Wave(void)
@@ -301,6 +320,10 @@ Wave::~Wave(void)
 
 void Wave::Init(void)
 {
+	for (int i = 0; i < startingMonsters; i++)
+	{
+		SpawnMonster(monsterTypes[gameLocal.random.RandomInt(monsterTypes.Num())], * gameLocal.towerManager->center);
+	}
 }
 
 void Wave::Update(void)
@@ -315,6 +338,21 @@ bool Wave::HasStarted(void)
 bool Wave::HasEnded(void)
 {
 	return false;
+}
+
+void Wave::SpawnMonster(idStr type, idVec3 origin)
+{
+	idDict dict;
+	dict.Set("classname", type);
+	dict.Set("origin", origin.ToString());
+	//dict.Set("name", ("wave_" + type + "_" + spawnedMonsters++).c_str());
+
+	idEntity* newEnt = nullptr;
+	gameLocal.SpawnEntityDef(dict, &newEnt);
+
+	if (newEnt) {
+		gameLocal.Printf("spawned entity '%s'\n", newEnt->name.c_str());
+	}
 }
 
 TowerDefList::TowerDefList(void)
