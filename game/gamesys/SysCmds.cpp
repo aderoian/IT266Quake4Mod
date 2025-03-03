@@ -3063,7 +3063,7 @@ void Cmd_CreateTower_f(const idCmdArgs& args) {
 		gameLocal.Printf("Usage: createTower <towerType>\n");
 		return;
 	}
-	auto towerDef = gameLocal.towerManager->towerDefinitions[args.Argv(1)];
+	//auto towerDef = gameLocal.towerManager->towerDefinitions[args.Argv(1)];
 	//Tower* tower = new Tower(player, towerDef);
 	//tower->Init(player->firstPersonViewOrigin);
 }
@@ -3132,7 +3132,7 @@ void Cmd_ListTowers_f(const idCmdArgs& args) {
 	gameLocal.Printf("====== Towers =====\n\n");
 	for (int i = 0; i < towerManager->towers.Num(); i++) {
 		auto tower = towerManager->towers[i];
-		gameLocal.Printf("Tower %d: %s | %s\n", i, tower->towerDef->name.c_str(), tower->origin->ToString());
+		gameLocal.Printf("Tower %d: %s | %s | Health: %d\n", i, tower->name, tower->origin->ToString(), tower->towerEntity->health);
 	}
 }
 
@@ -3184,6 +3184,42 @@ void Cmd_CreateWave_f(const idCmdArgs& args) {
 	towerManager->SetWave(wave);
 
 	gameLocal.Printf("Wave created with %d monsters\n", wave->startingMonsters);
+}
+
+void Cmd_ListWave_f(const idCmdArgs& args) {
+	TowerManager* towerManager = gameLocal.towerManager;
+	if (!towerManager) {
+		return;
+	}
+	auto wave = towerManager->wave;
+	if (!wave) {
+		gameLocal.Printf("No wave is currently active\n");
+		return;
+	}
+	gameLocal.Printf("____ Wave Info ____\n");
+	gameLocal.Printf("Total Monsters: %d\n", wave->startingMonsters);
+	gameLocal.Printf("Monsters Remaining: %d\n\n", wave->monstersLeft);
+	gameLocal.Printf("Monsters: ");
+	for (int i = 0; i < wave->monsters.Num(); i++) {
+		auto monster = wave->monsters[i];
+		if (!monster) continue;
+		auto target = monster->enemy.ent.GetEntity();
+		gameLocal.Printf("Monster: %s | Target: %s\n", wave->monsters[i]->name.c_str(), target ? target->name.c_str() : "NO TARGET");
+	}
+}
+
+void Cmd_GoTo_f(const idCmdArgs& args) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if (!player) {
+		return;
+	}
+	if (args.Argc() < 4) {
+		gameLocal.Printf("Usage: goTo <x> <y> <z>\n");
+		return;
+	}
+	
+	idVec3 origin(atof(args.Argv(1)), atof(args.Argv(2)), atof(args.Argv(3)));
+	player->Teleport(origin, player->GetPhysics()->GetAxis().ToAngles(), NULL);
 }
 // MOD END
 
@@ -3394,6 +3430,8 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("listtowers", Cmd_ListTowers_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists player towers");
 	cmdSystem->AddCommand("shoottower", Cmd_ShootTower_f, CMD_FL_GAME | CMD_FL_CHEAT, "forces a tower to shoot");
 	cmdSystem->AddCommand("createwave", Cmd_CreateWave_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a wave", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF>);
+	cmdSystem->AddCommand("listwave", Cmd_ListWave_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists the current wave");
+	cmdSystem->AddCommand("gotopos", Cmd_GoTo_f, CMD_FL_GAME | CMD_FL_CHEAT, "teleports the player to a position");
 // MOD END
 }
 

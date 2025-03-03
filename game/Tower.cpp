@@ -3,8 +3,9 @@
 
 #include "Tower.h"
 #include "Game_local.h"
+#include "Projectile.h"
 
-Tower::Tower(idPlayer* owner, const TowerDef* tower, idVec3* origin)  
+Tower::Tower(idPlayer* owner, TowerDef* tower, idVec3* origin)  
 {  
    this->owner = owner;  
    this->towerDef = tower;  
@@ -12,19 +13,31 @@ Tower::Tower(idPlayer* owner, const TowerDef* tower, idVec3* origin)
    towerEntity = nullptr;
 
    this->origin = origin;
-   id = gameLocal.towerManager->towerId++;
+   id = gameLocal.towerManager->entityId++;
+
+   auto tmpName = va("tower_%s_%d", towerDef->name.c_str(), id);
+   name = new char[strlen(tmpName) + 1];
+   strcpy(name, tmpName);
+
+   level = 1;
+   lastShot = -1;
+
    SpawnTower();
 }
 
 Tower::~Tower(void)
 {
 	gameLocal.Printf("Tower destroyed...\n");
+	owner = nullptr;
 
 	if (origin) 
 		delete origin;
 
+	delete[] name;
+	delete towerEntity;
 	towerEntity = nullptr;
 	init = false;
+
 }
 
 void Tower::SpawnTower()
@@ -42,6 +55,7 @@ void Tower::SpawnTower()
 	}
 	
 	dict.Set("classname", "player_animatedentity");
+	dict.Set("name", name);
 	dict.Set("angle", va("%f", yaw + 180));
 
 	dict.Set("origin", origin->ToString());
@@ -59,14 +73,29 @@ void Tower::SpawnTower()
 	}
 
 	towerEntity = newEnt;
+	towerEntity->health = 100; // TODO: tower health
 	init = true;
+}
+
+void Tower::ShootHitscan(Tower* tower, idVec3 target, const idDict* dict)
+{
+	idVec3 start = *tower->origin + (idVec3(0, 0, 1) * 50);
+	idVec3 dir = target - start;
+	dir.Normalize();
+	gameLocal.HitScan(*dict, start, dir, start, tower->towerEntity);
 }
 
 void Tower::Update(void)
 {
 	if (!init || !towerEntity) return;
 
-	if (gameLocal.GetTime() % shootDelay == 0)
+	if (towerEntity->health <= 0) {
+		gameLocal.Printf("Tower %s has been destroyed\n", name);
+		gameLocal.towerManager->DestroyTower(this);
+		return;
+	}
+	
+	if (gameLocal.GetTime() - lastShot > towerDef->shootDelay)
 		Shoot();
 }
 
@@ -87,6 +116,8 @@ bool Tower::CanShoot(void)
 
 void Tower::Shoot(void)
 {
+	lastShot = gameLocal.GetTime();
+
 	if (!CanShoot()) return;
 	ForceShoot();
 }
@@ -95,73 +126,89 @@ void Tower::ForceShoot(void)
 {
 	TowerShootFunc_t shootFunc = towerDef->shootFunc;
 	if (shootFunc) {
-		shootFunc(this);
+		idVec3 target = gameLocal.towerManager->wave->GetNearestMonster(this);
+		gameLocal.Printf("Shooting at %s\n", target.ToString());
+		shootFunc(this, target);
 	}
 }
 
-void Tower::ShootDarkMatter(Tower* tower)
+void Tower::Upgrade(void)
+{
+	if (level > towerDef->upgrades.Num()) return;
+
+	TowerDef upgrade = towerDef->upgrades[level-1];
+}
+
+void Tower::ShootDarkMatter(Tower* tower, idVec3 target)
 {
 
 }
 
-void Tower::ShootGauntlet(Tower* tower)
+void Tower::ShootGauntlet(Tower* tower, idVec3 target)
 {
 }
 
-void Tower::ShootGrenadeLauncher(Tower* tower)
+void Tower::ShootGrenadeLauncher(Tower* tower, idVec3 target)
 {
 }
 
-void Tower::ShootHyperBlaster(Tower* tower)
+void Tower::ShootHyperBlaster(Tower* tower, idVec3 target)
 {
 }
 
-void Tower::ShootLightning(Tower* tower)
+void Tower::ShootLightning(Tower* tower, idVec3 target)
+{
+	const idDict* dict = gameLocal.FindEntityDefDict("hitscan_lightninggun", false);
+	ShootHitscan(tower, target, dict); 
+}
+
+void Tower::ShootMachineGun(Tower* tower, idVec3 target)
+{
+	
+	const idDict *dict = gameLocal.FindEntityDefDict("hitscan_bullet", false);
+	ShootHitscan(tower, target, dict);
+}
+
+void Tower::ShootNailGun(Tower* tower, idVec3 target)
 {
 }
 
-void Tower::ShootMachineGun(Tower* tower)
+void Tower::ShootNapalm(Tower* tower, idVec3 target)
 {
 }
 
-void Tower::ShootNailGun(Tower* tower)
+void Tower::ShootRailgun(Tower* tower, idVec3 target)
+{
+	const idDict* dict = gameLocal.FindEntityDefDict("hitscan_railgun", false);
+	ShootHitscan(tower, target, dict);
+}
+
+void Tower::ShootRocketLauncher(Tower* tower, idVec3 target)
 {
 }
 
-void Tower::ShootNapalm(Tower* tower)
-{
-}
-
-void Tower::ShootRailgun(Tower* tower)
-{
-}
-
-void Tower::ShootRocketLauncher(Tower* tower)
-{
-}
-
-void Tower::GenerateGold(Tower* tower)
+void Tower::GenerateGold(Tower* tower, idVec3 target)
 {
 	gameLocal.Printf("Generating gold...\n");
 	tower->owner->inventory.gold += tower->GetDamage();
 }
 
-void Tower::GenerateEnergy(Tower* tower)
+void Tower::GenerateEnergy(Tower* tower, idVec3 target)
 {
 	tower->owner->inventory.energy += tower->GetDamage();
 }
 
-void Tower::GenerateStone(Tower* tower)
+void Tower::GenerateStone(Tower* tower, idVec3 target)
 {
 	tower->owner->inventory.stone += tower->GetDamage();
 }
 
-void Tower::GenerateWood(Tower* tower)
+void Tower::GenerateWood(Tower* tower, idVec3 target)
 {
 	tower->owner->inventory.wood += tower->GetDamage();
 }
 
-void Tower::GenerateBuilder(Tower* tower)
+void Tower::GenerateBuilder(Tower* tower, idVec3 target)
 {
 	tower->owner->inventory.builder += tower->GetDamage();
 }
@@ -170,7 +217,7 @@ TowerManager::TowerManager(void)
 {
 	gameLocal.Printf("Tower manager created...\n");
 
-	towerId = 0;
+	entityId = 0;
 
 	buildMode = false;
 	buildTower = nullptr;
@@ -178,30 +225,36 @@ TowerManager::TowerManager(void)
 	lastWaveStart = -1;
 	lastWaveEnd = -1;
 	waveDelay = 1 * 60 * 10 ^ 3;
+	waveCount = 0;
+	wave = nullptr;
 
-	towerDefinitions = TowerDefList();
+	towerDefinitions = DefList<TowerDef*>();
+	monsterDefinitions = DefList<WaveMonsterDef*>();
 	towers = idList<Tower*>();
 
 	center = new idVec3(0, 0, 0);
 
 	// Register Tower Definitions
-	Register(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(), 0, 0, 0, Tower::ShootDarkMatter));
-	Register(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 0, 0, 0, Tower::ShootGauntlet));
-	Register(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootGrenadeLauncher));
-	Register(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(), 0, 0, 0, Tower::ShootHyperBlaster));
-	Register(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 0, 0, 0, Tower::ShootLightning));
-	Register(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(), 0, 0, 0, Tower::ShootMachineGun));
-	Register(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNailGun));
-	Register(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNapalm));
-	Register(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 0, 0, 0, Tower::ShootRailgun));
-	Register(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootRocketLauncher));
+	RegisterTower(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(), 0, 0, 0, Tower::ShootDarkMatter, {}));
+	RegisterTower(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 0, 0, 0, Tower::ShootGauntlet, {}));
+	RegisterTower(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootGrenadeLauncher, {}));
+	RegisterTower(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(), 0, 0, 0, Tower::ShootHyperBlaster, {}));
+	RegisterTower(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 0, 500, 0, Tower::ShootLightning, {}));
+	RegisterTower(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(), 10, 500, 250, Tower::ShootMachineGun, {}));
+	RegisterTower(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNailGun, {}));
+	RegisterTower(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNapalm, {}));
+	RegisterTower(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 0, 500, 0, Tower::ShootRailgun, {}));
+	RegisterTower(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootRocketLauncher, {}));
 
 	// Economy Towers
-	Register(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateGold));
-	Register(new TowerDef("energy_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateEnergy));
-	Register(new TowerDef("stone_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateStone));
-	Register(new TowerDef("wood_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateWood));
-	Register(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateBuilder));
+	RegisterTower(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateGold, {}));
+	RegisterTower(new TowerDef("energy_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateEnergy, {}));
+	RegisterTower(new TowerDef("stone_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateStone, {}));
+	RegisterTower(new TowerDef("wood_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateWood, {}));
+	RegisterTower(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateBuilder, {}));
+
+	// Register Monster Definitions
+	RegisterMonster(new WaveMonsterDef("monster_berserker", 100, 50));
 }
 
 TowerManager::~TowerManager(void)
@@ -223,9 +276,14 @@ void TowerManager::Init(void)
 	gameLocal.Printf("Tower manager initialized...\n");
 }
 
-void TowerManager::Register(TowerDef* def)
+void TowerManager::RegisterTower(TowerDef* def)
 {
 	towerDefinitions.AddDef(def);
+}
+
+void TowerManager::RegisterMonster(WaveMonsterDef* def)
+{
+	monsterDefinitions.AddDef(def);
 }
 
 void TowerManager::Update(void)
@@ -273,6 +331,14 @@ void TowerManager::BuildTower(idVec3 origin)
 	AddTower(tower);
 }
 
+void TowerManager::DestroyTower(Tower* tower)
+{
+	if (!tower) return;
+	towers.Remove(tower);
+	delete tower;
+	CalculateCenter();
+}
+
 void TowerManager::CalculateCenter(void)
 {
 	int x = 0, y = 0, z = 0;
@@ -293,7 +359,49 @@ void TowerManager::CalculateCenter(void)
 
 void TowerManager::SetWave(Wave* wave)
 {
-	this->wave = wave;
+	this->wave = wave; 
+}
+
+Tower* TowerManager::FindTower(int id)
+{
+	for (int i = 0; i < towers.Num(); i++)
+	{
+		if (towers[i]->id == id) {
+			return towers[i];
+		}
+	}
+	return nullptr;
+}
+
+Tower* TowerManager::FindTower(idVec3 origin)
+{
+	Tower* closestTower = nullptr;
+	float closestDistance = 999999999;
+	for (int i = 0; i < towers.Num(); i++)
+	{
+		float distance = origin.Dist(*towers[i]->origin);
+		if (distance < closestDistance) {
+			closestTower = towers[i];
+			closestDistance = distance;
+		}
+	}
+	return closestTower;
+}
+
+Tower* TowerManager::FindTower(const char* name)
+{
+	gameLocal.Printf("Finding tower '%s'\n", name);
+	for (int i = 0; i < towers.Num(); i++)
+	{
+		auto tName = towers[i]->name;
+		gameLocal.Printf("Tower: %s\n", tName);
+		gameLocal.Printf("Comparing: '%s' and '%s'\n", name, tName);
+		if (strcmp(tName, name) == 0) {
+			gameLocal.Printf("Found tower '%s'\n", name);
+			return towers[i];
+		}
+	}
+	return nullptr;
 }
 
 void TowerManager::ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback)(const char* s)) {
@@ -312,6 +420,7 @@ Wave::Wave(int startingMonsters, idList<idStr> monsterTypes)
 	this->startingMonsters = startingMonsters;
 	this->monstersLeft = startingMonsters;
 	this->monsterTypes = monsterTypes;
+	this->monsters = idList<idAI*>();
 }
 
 Wave::~Wave(void)
@@ -340,12 +449,76 @@ bool Wave::HasEnded(void)
 	return false;
 }
 
+bool Wave::IsMonsterMember(idAI* monster)
+{
+	if (!monster) return false;
+	return monsters.FindIndex(monster) != -1;
+}
+
+void Wave::OnMonsterKilled(idAI* monster)
+{
+	if (!IsMonsterMember(monster)) return;
+
+	monsters.Remove(monster);
+	monstersLeft--;
+	if (monstersLeft == 0) {
+		// End Wave
+	}
+}
+
+void Wave::OnAttack(idAI* monster, idEntity* target, idEntity* projectile)
+{
+	if (!monster || !target) return;
+	if (!IsMonsterMember(monster)) return;
+
+	gameLocal.Printf("Monster '%s' attacked target '%s'\n", monster->name.c_str(), target->name.c_str());
+
+	idList<idStr> name;
+	monster->name.Split(name, '-');
+	if (name.Num() < 2) return;
+
+	gameLocal.Printf("Monster '%s' attacked target '%s'\n", name[0].c_str(), target->name.c_str());
+	int damage = gameLocal.towerManager->monsterDefinitions[name[0]]->baseDamage;
+	auto tower = gameLocal.towerManager->FindTower(target->name);
+
+	if (tower) {
+		gameLocal.Printf("Monster '%s' attacked target '%s' with damage '%d'\n", name[0].c_str(), target->name.c_str(), damage);
+		tower->towerEntity->health -= damage;
+	}
+}
+
+idVec3 Wave::GetNearestMonster(Tower* tower)
+{
+	int dist = tower->towerDef->GetRange(tower->level);
+	idVec3 loc = idVec3(0, 0, 0);
+	if (monsters.Num() == 0) return loc;
+
+	idAI* monster = nullptr;
+	for (int i = 0; i < monsters.Num(); i++)
+	{
+		monster = monsters[i];
+		if (!monster) continue;
+
+		if (dist == -1) {
+			loc = monster->GetPhysics()->GetOrigin();
+		}
+		else if (monster->GetPhysics()->GetOrigin().Dist(*tower->origin) < dist) {
+			loc = monster->GetPhysics()->GetOrigin();
+		}
+	}
+	return loc;
+}
+
 void Wave::SpawnMonster(idStr type, idVec3 origin)
 {
+	WaveMonsterDef* monsterDef = gameLocal.towerManager->monsterDefinitions[type];
+	if (!monsterDef) return;
+
 	idDict dict;
 	dict.Set("classname", type);
 	dict.Set("origin", origin.ToString());
-	//dict.Set("name", ("wave_" + type + "_" + spawnedMonsters++).c_str());
+	dict.Set("name", va("%s-%d", monsterDef->name.c_str(), gameLocal.towerManager->entityId++));
+	dict.Set("target", gameLocal.towerManager->towers[0]->name);
 
 	idEntity* newEnt = nullptr;
 	gameLocal.SpawnEntityDef(dict, &newEnt);
@@ -353,40 +526,77 @@ void Wave::SpawnMonster(idStr type, idVec3 origin)
 	if (newEnt) {
 		gameLocal.Printf("spawned entity '%s'\n", newEnt->name.c_str());
 	}
+
+	idAI* ai = dynamic_cast<idAI*>(newEnt);
+	if (ai) {
+		ai->SetEnemy(gameLocal.towerManager->towers[0]->towerEntity);
+	}
+
+	monsters.Append(ai);
 }
 
-TowerDefList::TowerDefList(void)
+template class DefList<TowerDef*>;
+template class DefList<WaveMonsterDef*>;
+
+template <class T>
+DefList<T>::DefList(void)
 {
-	towerDefs = idList<TowerDef*>();
+	defs = idList<T>();
 	keyMap = idDict();
 }
 
-TowerDefList::~TowerDefList(void)
+template <class T>
+DefList<T>::~DefList(void)
 {
-	for (int i = 0; i < towerDefs.Num(); i++)
+	for (int i = 0; i < defs.Num(); i++)
 	{
-		delete towerDefs[i];
+		delete defs[i];
 	}
 
-	towerDefs.Clear();
+	defs.Clear();
 	keyMap.Clear();
 }
 
-void TowerDefList::AddDef(TowerDef* def)
+template <class T>
+void DefList<T>::AddDef(T def)
 {
-	int index = towerDefs.Append(def);
+	int index = defs.Append(def);
 	keyMap.SetInt(def->name, index);
 }
 
-int TowerDefList::Num()
+template <class T>
+int DefList<T>::Num()
 {
-	return towerDefs.Num();
+	return defs.Num();
 }
 
-TowerDef* TowerDefList::GetDef(const char* name)
+template <class T>
+T DefList<T>::GetDef(const char* name)
 {
 	int index = keyMap.GetInt(name, "-1");
 	if (index == -1) return nullptr;
 
-	return towerDefs[index];
+	return defs[index];
+}
+
+int TowerDef::GetDamage(int level)
+{
+	if (level == 1) return damage;
+	if (level > upgrades.Num()) return damage;
+
+	return upgrades[level - 1].damage;
+}
+
+int TowerDef::GetRange(int level)
+{
+	if (level == 1) return range;
+	if (level > upgrades.Num()) return range;
+	return upgrades[level - 1].range;
+}
+
+int TowerDef::GetShootDelay(int level)
+{
+	if (level == 1) return shootDelay;
+	if (level > upgrades.Num()) return shootDelay;
+	return upgrades[level - 1].shootDelay;
 }

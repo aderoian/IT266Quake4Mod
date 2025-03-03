@@ -2190,6 +2190,8 @@ bool idAI::SetEnemy( idEntity *newEnemy ) {
 	enemy.fl.dead		= false;
 	enemy.fl.lockOrigin	= false;
 
+	if (newEnemy->name == "player1") return false;
+
 	if ( !newEnemy ) {
 		ClearEnemy ( false );
 	} else {
@@ -2646,7 +2648,13 @@ idProjectile* idAI::AttackRanged (
 
 	// If shooting at another ai entity then kick off an attack reaction
 	if ( enemy.ent && enemy.ent->IsType ( idAI::GetClassType() ) ) {
-		static_cast<idAI*>(enemy.ent.GetEntity())->ReactToShotAt ( this, muzzleOrigin, axis[0] );
+		// TODO: Check this for actual effect on AI targets
+		//static_cast<idAI*>(enemy.ent.GetEntity())->ReactToShotAt ( this, muzzleOrigin, axis[0] );
+	}
+
+	auto wave = gameLocal.towerManager->wave;
+	if (wave) {
+		wave->OnAttack(this, target, lastProjectile);
 	}
 
 	return lastProjectile;
@@ -3683,6 +3691,11 @@ void idAI::OnDeath( void ){
 	aiManager.RemoveTeammate ( this );
 
 	ExecScriptFunction( funcs.death );
+
+	auto wave = gameLocal.towerManager->wave;
+	if (wave) {
+		wave->OnMonsterKilled(this);
+	}
 
 /* DONT DROP ANYTHING FOR NOW
 	float rVal = gameLocal.random.RandomInt( 100 );
