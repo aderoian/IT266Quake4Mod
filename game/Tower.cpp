@@ -82,7 +82,7 @@ void Tower::ShootHitscan(Tower* tower, idVec3 target, const idDict* dict)
 	idVec3 start = *tower->origin + (idVec3(0, 0, 1) * 50);
 	idVec3 dir = target - start;
 	dir.Normalize();
-	gameLocal.HitScan(*dict, start, dir, start, tower->towerEntity);
+	idEntity* hit = gameLocal.HitScan(*dict, start, dir, start, tower->towerEntity, false);
 }
 
 void Tower::Update(void)
@@ -127,7 +127,6 @@ void Tower::ForceShoot(void)
 	TowerShootFunc_t shootFunc = towerDef->shootFunc;
 	if (shootFunc) {
 		idVec3 target = gameLocal.towerManager->wave->GetNearestMonster(this);
-		gameLocal.Printf("Shooting at %s\n", target.ToString());
 		shootFunc(this, target);
 	}
 }
@@ -158,8 +157,7 @@ void Tower::ShootHyperBlaster(Tower* tower, idVec3 target)
 
 void Tower::ShootLightning(Tower* tower, idVec3 target)
 {
-	const idDict* dict = gameLocal.FindEntityDefDict("hitscan_lightninggun", false);
-	ShootHitscan(tower, target, dict); 
+	ShootHitscan(tower, target, gameLocal.FindEntityDefDict("hitscan_lightninggun", false));
 }
 
 void Tower::ShootMachineGun(Tower* tower, idVec3 target)
@@ -189,7 +187,6 @@ void Tower::ShootRocketLauncher(Tower* tower, idVec3 target)
 
 void Tower::GenerateGold(Tower* tower, idVec3 target)
 {
-	gameLocal.Printf("Generating gold...\n");
 	tower->owner->inventory.gold += tower->GetDamage();
 }
 
@@ -224,13 +221,14 @@ TowerManager::TowerManager(void)
 
 	lastWaveStart = -1;
 	lastWaveEnd = -1;
-	waveDelay = 1 * 60 * 10 ^ 3;
+	waveDelay = 15;
 	waveCount = 0;
 	wave = nullptr;
 
 	towerDefinitions = DefList<TowerDef*>();
 	monsterDefinitions = DefList<WaveMonsterDef*>();
 	towers = idList<Tower*>();
+	gameStarted = false;
 
 	center = new idVec3(0, 0, 0);
 
@@ -239,11 +237,11 @@ TowerManager::TowerManager(void)
 	RegisterTower(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 0, 0, 0, Tower::ShootGauntlet, {}));
 	RegisterTower(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootGrenadeLauncher, {}));
 	RegisterTower(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(), 0, 0, 0, Tower::ShootHyperBlaster, {}));
-	RegisterTower(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 0, 500, 0, Tower::ShootLightning, {}));
+	RegisterTower(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 10, 500, 250, Tower::ShootLightning, {}));
 	RegisterTower(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(), 10, 500, 250, Tower::ShootMachineGun, {}));
 	RegisterTower(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNailGun, {}));
 	RegisterTower(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 0, 0, 0, Tower::ShootNapalm, {}));
-	RegisterTower(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 0, 500, 0, Tower::ShootRailgun, {}));
+	RegisterTower(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 10, 500, 250, Tower::ShootRailgun, {}));
 	RegisterTower(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 0, 0, 0, Tower::ShootRocketLauncher, {}));
 
 	// Economy Towers
@@ -254,7 +252,7 @@ TowerManager::TowerManager(void)
 	RegisterTower(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateBuilder, {}));
 
 	// Register Monster Definitions
-	RegisterMonster(new WaveMonsterDef("monster_berserker", 100, 50));
+	RegisterMonster(new WaveMonsterDef("monster_berserker", 100, 50, 1));
 }
 
 TowerManager::~TowerManager(void)
@@ -288,11 +286,25 @@ void TowerManager::RegisterMonster(WaveMonsterDef* def)
 
 void TowerManager::Update(void)
 {
-	// Update Wave
-	if (!wave && gameLocal.GetTime() > (lastWaveEnd + waveDelay)) {
-		/*wave = new Wave();
-		wave->Init();*/
+	if (!gameStarted) {
+		if (towers.Num() > 2) {
+			gameStarted = true;
+		}
+		else {
+			return;
+		}
 	}
+
+	if (wave) {
+		if (wave->HasEnded()) {
+			delete wave;
+			wave = nullptr;
+			lastWaveEnd = gameLocal.GetTime();
+		}
+	} else if (gameLocal.GetTime() - lastWaveEnd > waveDelay){
+		SpawnWave();
+	}
+
 
 	// Update Towers
 	for (int i = 0; i < towers.Num(); i++)
@@ -341,6 +353,12 @@ void TowerManager::DestroyTower(Tower* tower)
 
 void TowerManager::CalculateCenter(void)
 {
+	if (towers.Num() == 0) {
+		delete center;
+		center = new idVec3(0, 0, 0);
+		return;
+	}
+
 	int x = 0, y = 0, z = 0;
 	for (int i = 0; i < towers.Num(); i++)
 	{
@@ -359,7 +377,13 @@ void TowerManager::CalculateCenter(void)
 
 void TowerManager::SetWave(Wave* wave)
 {
+	if (this->wave) { 
+		gameLocal.Printf("ERROR: Wave already in progress.");
+		return;
+	}
 	this->wave = wave; 
+	this->lastWaveStart = gameLocal.GetTime();
+	this->waveCount++;
 }
 
 Tower* TowerManager::FindTower(int id)
@@ -415,12 +439,31 @@ void TowerManager::ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback
 	}
 }
 
+void TowerManager::SpawnWave(void)
+{
+	int newLevel = waveCount + 1;
+	idList<idStr> monsterTypes = idList<idStr>();
+	for (int i = 0; i < monsterDefinitions.Num(); i++)
+	{
+		auto def = monsterDefinitions[i];
+		if (def->startingWave <= newLevel) {
+			monsterTypes.Append(def->name);
+		}
+	}
+
+	int monsterCount = 10 + (newLevel * 5);
+	Wave* wave = new Wave(monsterCount, monsterTypes);
+	wave->Init();
+	SetWave(wave);
+}
+
 Wave::Wave(int startingMonsters, idList<idStr> monsterTypes)
 {
 	this->startingMonsters = startingMonsters;
 	this->monstersLeft = startingMonsters;
 	this->monsterTypes = monsterTypes;
 	this->monsters = idList<idAI*>();
+	this->started = false;
 }
 
 Wave::~Wave(void)
@@ -429,24 +472,36 @@ Wave::~Wave(void)
 
 void Wave::Init(void)
 {
+	if (monsterTypes.Num() == 0) {
+		gameLocal.Printf("No monsters to spawn\n");
+		return;
+	}
+
+	for (int i = 0; i < monsterTypes.Num(); i++)
+	{
+		gameLocal.Printf("Monster: %s\n", monsterTypes[i].c_str());
+	}
 	for (int i = 0; i < startingMonsters; i++)
 	{
 		SpawnMonster(monsterTypes[gameLocal.random.RandomInt(monsterTypes.Num())], * gameLocal.towerManager->center);
 	}
+
+	started = true;
 }
 
 void Wave::Update(void)
 {
+	
 }
 
 bool Wave::HasStarted(void)
 {
-	return false;
+	return started;
 }
 
 bool Wave::HasEnded(void)
 {
-	return false;
+	return monstersLeft == 0;
 }
 
 bool Wave::IsMonsterMember(idAI* monster)
@@ -461,9 +516,6 @@ void Wave::OnMonsterKilled(idAI* monster)
 
 	monsters.Remove(monster);
 	monstersLeft--;
-	if (monstersLeft == 0) {
-		// End Wave
-	}
 }
 
 void Wave::OnAttack(idAI* monster, idEntity* target, idEntity* projectile)

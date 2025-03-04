@@ -7530,7 +7530,8 @@ idEntity* idGameLocal::HitScan(
 	float			damageScale,
 // twhitaker: added additionalIgnore parameter
 	idEntity*		additionalIgnore,
-	int				areas[ 2 ]
+	int				areas[ 2 ],
+	bool 			doDmg
 	) {
 
 	idVec3		dir;
@@ -7694,7 +7695,7 @@ idEntity* idGameLocal::HitScan(
 				ent->ApplyImpulse( owner, tr.c.id, tr.c.point, -tr.c.normal, &hitscanDict );
 
 				// Handle damage to the entity
-				if ( ent->fl.takedamage && !(( tr.c.material != NULL ) && ( tr.c.material->GetSurfaceFlags() & SURF_NODAMAGE )) ) {		
+				if (doDmg && ent->fl.takedamage && !(( tr.c.material != NULL ) && ( tr.c.material->GetSurfaceFlags() & SURF_NODAMAGE )) ) {		
 					const char*	damage;
 				
 					damage    = NULL;

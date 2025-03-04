@@ -799,7 +799,7 @@ public:
 	void					CheckPlayerWhizzBy	( idVec3 start, idVec3 end, idEntity* hitEnt, idEntity *attacker );
 // bdube: added hitscan
 // twhitaker: added additionalIgnore parameter
-	idEntity* HitScan(const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity* additionalIgnore = NULL, int* areas = NULL);
+	idEntity* HitScan(const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity* additionalIgnore = NULL, int* areas = NULL, bool noDmg = false);
 	idVec3 Raycast(const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity* additionalIgnore = NULL, int* areas = NULL);
 
 	// bdube: added effect calls

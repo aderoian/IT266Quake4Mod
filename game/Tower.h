@@ -24,6 +24,7 @@ public:
 
 private:
 	idList<idStr> monsterTypes;
+	bool started;
 
 private:
 	void SpawnMonster(idStr type, idVec3 origin);
@@ -107,17 +108,20 @@ struct WaveMonsterDef {
 	idStr name;
 	int baseHealth;
 	int baseDamage;
+	int startingWave;
 
 	WaveMonsterDef() {
 		this->name = "";
 		this->baseHealth = 0;
 		this->baseDamage = 0;
+		this->startingWave = 0;
 	}
 
-	WaveMonsterDef(idStr name, int baseHealth, int baseDamage) {
+	WaveMonsterDef(idStr name, int baseHealth, int baseDamage, int startingWave) {
 		this->name = name;
 		this->baseHealth = baseHealth;
 		this->baseDamage = baseDamage;
+		this->startingWave = startingWave;
 	}
 };
 
@@ -206,7 +210,10 @@ public:
 	DefList<WaveMonsterDef*> monsterDefinitions;
 
 	idList<Tower*> towers;
+	bool gameStarted; 
+
 	Wave* wave;
+	int waveCount;
 
 	idVec3* center;
 
@@ -239,7 +246,9 @@ private:
 	int lastWaveStart;
 	int lastWaveEnd;
 	int waveDelay;
-	int waveCount;
+
+private:
+	void SpawnWave(void);
 };
 
 #endif // __TOWER_H__

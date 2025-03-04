@@ -3496,6 +3496,16 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		_hud->SetStateInt("player_builder", inventory.builder);
 	}
 
+	auto towerManager = gameLocal.towerManager;
+	const char* tempStr;
+	if (towerManager) {
+		tempStr = _hud->State().GetString("player_wave", "-1");
+		auto waveStatus = towerManager->gameStarted ? towerManager->wave ? va("Wave %d", towerManager->waveCount) : "Wave Over" : "Build Phase";
+		if (strcmp(waveStatus, tempStr) != 0) {
+			_hud->SetStateString("player_wave", waveStatus);
+		}
+	}
+
 	// MOD END
 	
 	_hud->StateChanged( gameLocal.time );
