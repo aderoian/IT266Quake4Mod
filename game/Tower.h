@@ -27,7 +27,7 @@ private:
 	bool started;
 
 private:
-	void SpawnMonster(idStr type, idVec3 origin);
+	void SpawnMonster(idStr type);
 };
 
 struct ResourceCost {
@@ -215,8 +215,6 @@ public:
 	Wave* wave;
 	int waveCount;
 
-	idVec3* center;
-
 public:
 	TowerManager(void);
 	~TowerManager(void);
@@ -230,10 +228,10 @@ public:
 	bool CanTowersShoot(void);
 
 	void ToggleBuild(void);
+	void SetBuildTowerFromKey(int key);
 	void BuildTower(idVec3 origin);
 	void DestroyTower(Tower* tower);
 
-	void CalculateCenter(void);
 	void SetWave(Wave* wave);
 
 	Tower* FindTower(int id);
@@ -241,6 +239,7 @@ public:
 	Tower* FindTower(const char* name);
 
 	static void ArgCompletion_TowerDefs(const idCmdArgs& args, void(*callback)(const char* s));
+	static void ToggleHelpMenu(void);
 
 private:
 	int lastWaveStart;

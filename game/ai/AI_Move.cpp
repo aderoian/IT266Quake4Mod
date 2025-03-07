@@ -4801,6 +4801,10 @@ void idAI::Move	( void ) {
 		aiManager.timerMove.Start ( );
 	}
 
+	/*if (enemy.ent) {
+		move.moveDest = enemy.ent->GetPhysics()->GetOrigin();
+	}*/
+
 	switch( move.moveType ) {
 	case MOVETYPE_DEAD:
 		DeadMove();

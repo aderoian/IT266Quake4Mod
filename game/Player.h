@@ -273,9 +273,9 @@ public:
 	int wood;
 	int builder;
 
-	bool ProcessTransaction(ResourceCost cost);
-	bool ProcessEnergyTransaction(int cost);
-	bool ProcessBuilderTransaction(int cost);
+	bool ProcessTransaction(ResourceCost cost, bool take);
+	bool ProcessEnergyTransaction(int cost, bool take);
+	bool ProcessBuilderTransaction(int cost, bool take);
 
 
 	// MODDED END

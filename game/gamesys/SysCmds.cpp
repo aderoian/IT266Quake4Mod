@@ -3132,7 +3132,7 @@ void Cmd_ListTowers_f(const idCmdArgs& args) {
 	gameLocal.Printf("====== Towers =====\n\n");
 	for (int i = 0; i < towerManager->towers.Num(); i++) {
 		auto tower = towerManager->towers[i];
-		gameLocal.Printf("Tower %d: %s | %s | Health: %d\n", i, tower->name, tower->origin->ToString(), tower->towerEntity->health);
+		gameLocal.Printf("Tower %d: %s | Damage: %d | Range: %d Level: %d | Health: %d\n", i, tower->name, tower->GetDamage(), tower->GetRange(), tower->level, tower->towerEntity->health);
 	}
 }
 
@@ -3220,6 +3220,45 @@ void Cmd_GoTo_f(const idCmdArgs& args) {
 	
 	idVec3 origin(atof(args.Argv(1)), atof(args.Argv(2)), atof(args.Argv(3)));
 	player->Teleport(origin, player->GetPhysics()->GetAxis().ToAngles(), NULL);
+}
+
+void Cmd_SetResource_f(const idCmdArgs& args) {
+	idPlayer* player = gameLocal.GetLocalPlayer();
+	if (!player) {
+		return;
+	}
+
+	if (args.Argc() < 3) {
+		gameLocal.Printf("Usage: setResource <resourceType> <value>\n");
+		return;
+	}
+	idStr resourceType = args.Argv(1);
+	int value = atoi(args.Argv(2));
+	if (resourceType == "gold") {
+		player->inventory.gold = value;
+	}
+	else if (resourceType == "wood") {
+		player->inventory.wood = value;
+	}
+	else if (resourceType == "stone") {
+		player->inventory.stone = value;
+	}
+	else if (resourceType == "energy") {
+		player->inventory.energy = value;
+	}
+	else if (resourceType == "builder") {
+		player->inventory.builder = value;
+	}
+	else if (resourceType == "all") {
+		player->inventory.gold = value;
+		player->inventory.wood = value;
+		player->inventory.stone = value;
+		player->inventory.energy = value;
+		player->inventory.builder = value;
+	}
+	else {
+		gameLocal.Printf("Invalid resource type\n");
+	}
 }
 // MOD END
 
@@ -3432,6 +3471,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand("createwave", Cmd_CreateWave_f, CMD_FL_GAME | CMD_FL_CHEAT, "creates a wave", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF>);
 	cmdSystem->AddCommand("listwave", Cmd_ListWave_f, CMD_FL_GAME | CMD_FL_CHEAT, "lists the current wave");
 	cmdSystem->AddCommand("gotopos", Cmd_GoTo_f, CMD_FL_GAME | CMD_FL_CHEAT, "teleports the player to a position");
+	cmdSystem->AddCommand("setresources", Cmd_SetResource_f, CMD_FL_GAME | CMD_FL_CHEAT, "set resources for the player");
 // MOD END
 }
 

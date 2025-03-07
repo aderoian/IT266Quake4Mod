@@ -1174,7 +1174,7 @@ void idAI::Think( void ) {
 			actionTime += gameLocal.msec;
 		}
 
-		ValidateCover();
+		//ValidateCover();
 
 		move.current_yaw += deltaViewAngles.yaw;
 		move.ideal_yaw = idMath::AngleNormalize180( move.ideal_yaw + deltaViewAngles.yaw );
@@ -1998,6 +1998,14 @@ idAI::UpdateEnemy
 */
 void idAI::UpdateEnemy ( void ) {
 	predictedPath_t predictedPath;
+
+	auto towerManager = gameLocal.towerManager;
+	if (towerManager) {
+		auto tower = towerManager->FindTower(GetPhysics()->GetOrigin());
+		if (tower) {
+			SetEnemy(tower->towerEntity);
+		}
+	}
 	
 	// If we lost our enemy then clear it out to be sure
 	if( !enemy.ent ) {
@@ -2190,11 +2198,19 @@ bool idAI::SetEnemy( idEntity *newEnemy ) {
 	enemy.fl.dead		= false;
 	enemy.fl.lockOrigin	= false;
 
-	if (newEnemy->name == "player1") return false;
-
 	if ( !newEnemy ) {
 		ClearEnemy ( false );
 	} else {
+		if (newEnemy->name == "player1") return false;
+
+		TowerManager* tW = gameLocal.towerManager;
+		if (tW) {
+			Tower* t = tW->FindTower(newEnemy->name);
+			if (!t) {
+				return false;
+			}
+		}
+
 		// Set our current enemy
 		enemy.ent = newEnemy;
 
@@ -2476,9 +2492,9 @@ bool idAI::Attack ( const char* attackName, jointHandle_t joint, idEntity* targe
 	}
 
 	// Melee Attack?
-	if ( spawnArgs.GetBool ( va("attack_%s_melee", attackName ), "0" ) ) {
+	/*if ( spawnArgs.GetBool ( va("attack_%s_melee", attackName ), "0" ) ) {
 		return AttackMelee ( attackName, attackDict );
-	}
+	}*/
 
 	// Ranged attack (hitscan or projectile)?
 	return ( AttackRanged ( attackName, attackDict, joint, target, pushVelocity ) != NULL );
@@ -3665,7 +3681,7 @@ void idAI::Postthink( void ){
 	}
 	
 	// Keep our threat value up to date
-	UpdateThreat ( );
+	//UpdateThreat ( );
 }
 
 /*
@@ -4896,7 +4912,7 @@ idAI::ReactToPain
 ============
 */
 void idAI::ReactToPain ( idEntity* attacker, int damage ) {
-	CheckForReplaceEnemy ( attacker );
+	//CheckForReplaceEnemy ( attacker );
 }
 	
 /*

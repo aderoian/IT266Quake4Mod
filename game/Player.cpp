@@ -1060,31 +1060,33 @@ int idInventory::HasAmmo( const char *weapon_classname ) {
 	return HasAmmo( index, ammoRequired );
 }
 
-bool idInventory::ProcessTransaction(ResourceCost cost)
+bool idInventory::ProcessTransaction(ResourceCost cost, bool take = true)
 {
 	if (cost.gold <= gold && cost.stone <= stone && cost.wood <= wood) {
-		gold -= cost.gold;
-		stone -= cost.stone;
-		wood -= cost.wood;
+		if (take) {
+			gold -= cost.gold;
+			stone -= cost.stone;
+			wood -= cost.wood;
+		}
 		return true;
 	}
 
 	return false;
 }
 
-bool idInventory::ProcessEnergyTransaction(int cost)
+bool idInventory::ProcessEnergyTransaction(int cost, bool take = true)
 {
 	if (cost <= energy) {
-		energy -= cost;
+		if (take) energy -= cost;
 		return true;
 	}
 	return false;
 }
 
-bool idInventory::ProcessBuilderTransaction(int cost)
+bool idInventory::ProcessBuilderTransaction(int cost, bool take = true)
 {
 	if (cost <= builder) {
-		builder -= cost;
+		if (take) builder -= cost;
 		return true;
 	}
 	return false;
@@ -8527,8 +8529,13 @@ void idPlayer::PerformImpulse( int impulse ) {
 		ClientSendEvent( EVENT_IMPULSE, &msg );
 	}
 
+	gameLocal.Printf("PerformImpulse: %d\n", impulse);
+	TowerManager* tM = gameLocal.towerManager;
+
 	if ( impulse >= IMPULSE_0 && impulse <= IMPULSE_12 ) {
-		SelectWeapon( impulse, false );
+		//TODO: Set build tower
+		tM->SetBuildTowerFromKey(impulse);
+		//SelectWeapon( impulse, false );
 		return;
 	}
 
@@ -8549,34 +8556,40 @@ void idPlayer::PerformImpulse( int impulse ) {
 
 	switch( impulse ) {
 		case IMPULSE_13: {
-			Reload();
+			tM->SetBuildTowerFromKey(impulse);
+			//Reload();
 			break;
 		}
 		case IMPULSE_14: {
-			NextWeapon();
+			tM->SetBuildTowerFromKey(impulse);
+			/*NextWeapon();
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCycleNext( this );
-			}
+			}*/
 			break;
 		}
 		case IMPULSE_15: {
-			PrevWeapon();
+			tM->SetBuildTowerFromKey(impulse);
+			/*PrevWeapon();
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCyclePrev( this );
-			}
+			}*/
 			break;
 		}
 		case IMPULSE_17: {
- 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
+			tM->SetBuildTowerFromKey(impulse);
+ 			/*if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
  				gameLocal.mpGame.ToggleReady( );
-			}
+			}*/
 			break;
 		}
 		case IMPULSE_18: {
-			centerView.Init(gameLocal.time, 200, viewAngles.pitch, 0);
+			tM->SetBuildTowerFromKey(impulse);
+			//centerView.Init(gameLocal.time, 200, viewAngles.pitch, 0);
 			break;
 		}
 		case IMPULSE_19: {
+			TowerManager::ToggleHelpMenu();
 /*		
 			// when we're not in single player, IMPULSE_19 is used for showScores
 			// otherwise it does IMPULSE_12 (PDA)
@@ -8617,9 +8630,10 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 		case IMPULSE_22: {
- 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
+
+ 			/*if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
  				gameLocal.mpGame.ToggleSpectate( );
-   			}
+   			}*/
    			break;
    		}
 				
@@ -8673,7 +8687,8 @@ void idPlayer::PerformImpulse( int impulse ) {
 // RITUAL END
 
 		case IMPULSE_50: {
-			ToggleFlashlight ( );
+			gameLocal.towerManager->ToggleBuild();
+			//ToggleFlashlight ( );
 			break;
 		}
 

@@ -832,7 +832,7 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
  				if ( damageDefName[0] != '\0' ) {
 					idVec3 dir = velocity;
 					dir.Normalize();
-					actualHitEnt->Damage( this, owner, dir, damageDefName, damagePower, CLIPMODEL_ID_TO_JOINT_HANDLE( collision.c.id ) );
+					//actualHitEnt->Damage( this, owner, dir, damageDefName, damagePower, CLIPMODEL_ID_TO_JOINT_HANDLE( collision.c.id ) );
 				}
 			}
 			return false;		
@@ -891,7 +891,11 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 				}
 			}	
 // RAVEN END
- 			ent->Damage( this, owner, dir, damageDefName, damagePower, hitJoint );
+ 			//ent->Damage( this, owner, dir, damageDefName, damagePower, hitJoint );
+			TowerManager* towerManager = gameLocal.towerManager;
+			if (towerManager) {
+				//TODO: Proper Damage
+			}
 			
 			if( owner && owner->IsType( idPlayer::GetClassType() ) && ent->IsType( idActor::GetClassType() ) ) {
 				statManager->WeaponHit( (const idActor*)(owner.GetEntity()), ent, methodOfDeath, hitCount == 0 );			
@@ -1110,7 +1114,7 @@ idProjectile::Event_RadiusDamage
 void idProjectile::Event_RadiusDamage( idEntity *ignore ) {
 	const char *splash_damage = spawnArgs.GetString( "def_splash_damage" );
 	if ( splash_damage[0] != '\0' ) {
-		gameLocal.RadiusDamage( physicsObj.GetOrigin(), this, owner, ignore, this, splash_damage, damagePower, &hitCount );
+		//gameLocal.RadiusDamage( physicsObj.GetOrigin(), this, owner, ignore, this, splash_damage, damagePower, &hitCount );
 	}
 }
 
@@ -1122,7 +1126,7 @@ idProjectile::Event_ResidualDamage
 void idProjectile::Event_ResidualDamage ( idEntity* ignore ) {
 	const char *residual_damage = spawnArgs.GetString( "def_residual_damage" );
 	if ( residual_damage[0] != '\0' ) {
-		gameLocal.RadiusDamage( physicsObj.GetOrigin(), this, owner, ignore, this, residual_damage, damagePower, &hitCount );
+		//gameLocal.RadiusDamage( physicsObj.GetOrigin(), this, owner, ignore, this, residual_damage, damagePower, &hitCount );
 	}
 
 	// Keep the loop going
