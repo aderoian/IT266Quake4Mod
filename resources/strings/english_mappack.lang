@@ -1,0 +1,14 @@
+// string table
+// english
+//
+
+{	
+	"#str_600001" 	"CAMPGROUNDS REDUX"
+	"#str_600005" 	"TREMORS"
+	"#str_600007" 	"RAILED"
+	"#str_600008" 	"Gold:"
+	"#str_600009" 	"Stone:"
+	"#str_600010" 	"Wood:"
+	"#str_600011" 	"Energy:"
+	"#str_600012" 	"Builders:"
+}

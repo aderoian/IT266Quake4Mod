@@ -832,7 +832,7 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
  				if ( damageDefName[0] != '\0' ) {
 					idVec3 dir = velocity;
 					dir.Normalize();
-					//actualHitEnt->Damage( this, owner, dir, damageDefName, damagePower, CLIPMODEL_ID_TO_JOINT_HANDLE( collision.c.id ) );
+					//actualHitEnt->Damage( this, owner, dir, damageDefName, damagePower, CLIPMODEL_ID_TO_JOINT_HANDLE( collision.c.id ) 
 				}
 			}
 			return false;		
@@ -892,9 +892,19 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 			}	
 // RAVEN END
  			//ent->Damage( this, owner, dir, damageDefName, damagePower, hitJoint );
-			TowerManager* towerManager = gameLocal.towerManager;
-			if (towerManager) {
-				//TODO: Proper Damage
+			if (owner) {
+				gameLocal.Printf("Projectile from %s hit AI %s\n", owner->name.c_str(), ent->name.c_str());
+				TowerManager* towerManager = gameLocal.towerManager;
+				if (towerManager) {
+					Wave* wave = towerManager->wave;
+					if (wave && wave->IsMonsterMember(ent)) {
+						Tower* tower = towerManager->FindTower(owner->name);
+						if (tower) {
+
+							tower->Damage(ent);
+						}
+					}
+				}
 			}
 			
 			if( owner && owner->IsType( idPlayer::GetClassType() ) && ent->IsType( idActor::GetClassType() ) ) {

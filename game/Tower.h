@@ -16,7 +16,7 @@ public:
 	bool HasStarted(void);
 	bool HasEnded(void);
 
-	bool IsMonsterMember(idAI* monster);
+	bool IsMonsterMember(idEntity* monster);
 	void OnMonsterKilled(idAI* monster);
 	void OnAttack(idAI* monster, idEntity* target, idEntity* projectile);
 
@@ -71,6 +71,7 @@ struct TowerDef {
 	idStr name;
 	idStr model;
 	ResourceCost cost;
+	int health;
 	int damage;
 	int range;
 	int shootDelay;
@@ -81,6 +82,7 @@ struct TowerDef {
 		this->name = "";
 		this->model = "";
 		this->cost = ResourceCost(0, 0, 0);
+		this->health = 0;
 		this->damage = 0;
 		this->range = 0;
 		this->shootDelay = 0;
@@ -88,10 +90,11 @@ struct TowerDef {
 		this->upgrades = idList<TowerDef>();
 	}
 
-	TowerDef(idStr name, idStr model, ResourceCost cost, int damage, int range, int shootDelay, TowerShootFunc_t shootFunc, idList<TowerDef> upgrades) {
+	TowerDef(idStr name, idStr model, ResourceCost cost, int health, int damage, int range, int shootDelay, TowerShootFunc_t shootFunc, idList<TowerDef> upgrades) {
 		this->name = name;
 		this->model = model;
 		this->cost = cost;
+		this->health = health;
 		this->damage = damage;
 		this->range = range;
 		this->shootDelay = shootDelay;
@@ -173,6 +176,7 @@ public:
 	void ForceShoot(); // Shoots without checking if we can actually shoot
 
 	void Upgrade(void);
+	void Damage(idEntity* target);
 
 	static void ShootDarkMatter(Tower* tower, idVec3 target);
 	static void ShootGauntlet(Tower* tower, idVec3 target);
@@ -204,7 +208,7 @@ class TowerManager {
 public:
 	int entityId;
 
-	bool buildMode;
+	int buildMode;
 	TowerDef* buildTower;
 	DefList<TowerDef*> towerDefinitions;
 	DefList<WaveMonsterDef*> monsterDefinitions;
@@ -230,6 +234,7 @@ public:
 	void ToggleBuild(void);
 	void SetBuildTowerFromKey(int key);
 	void BuildTower(idVec3 origin);
+	void UpgradeTower(idVec3 origin);
 	void DestroyTower(Tower* tower);
 
 	void SetWave(Wave* wave);
@@ -245,6 +250,7 @@ private:
 	int lastWaveStart;
 	int lastWaveEnd;
 	int waveDelay;
+	bool spawned;
 
 private:
 	void SpawnWave(void);

@@ -236,11 +236,11 @@ void idInventory::Clear( void ) {
 	memset( ammoRegenTime, -1, sizeof( int ) * MAX_WEAPONS );
 
 	// MODDED BEGIN
-	gold = 0;
-	energy = 0;
-	stone = 0;
-	wood = 0;
-	builder = 0;
+	gold = 500;
+	energy = 500;
+	stone = 500;
+	wood = 500;
+	builder = 10;
 	// MODDED END
 }
 
@@ -3506,6 +3506,28 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		if (strcmp(waveStatus, tempStr) != 0) {
 			_hud->SetStateString("player_wave", waveStatus);
 		}
+
+		idStr buildString;
+		int buildMode = towerManager->buildMode;
+		if (buildMode == 0) {
+			buildString = "Build: Off";
+		}
+		else if (buildMode == 1) {
+			buildString = "Build Tower";
+		}
+		else if (buildMode == 2) {
+			buildString = "Upgrade Tower";
+		}
+		tempStr = _hud->State().GetString("player_buildmode", "-1");
+		if (strcmp(buildString, tempStr)) {
+			_hud->SetStateString("player_buildmode", buildString);
+		}
+		tempStr = _hud->State().GetString("player_buildtower", "-1");
+		idStr buildTower = towerManager->buildTower ? towerManager->buildTower->name : "None";
+		if (strcmp(buildString, buildTower)) {
+			_hud->SetStateString("player_buildtower", buildTower);
+		}
+
 	}
 
 	// MOD END
@@ -8589,9 +8611,8 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 		case IMPULSE_19: {
-			TowerManager::ToggleHelpMenu();
-/*		
-			// when we're not in single player, IMPULSE_19 is used for showScores
+			
+/*// when we're not in single player, IMPULSE_19 is used for showScores
 			// otherwise it does IMPULSE_12 (PDA)
 			if ( !gameLocal.isMultiplayer ) {
 				if ( !objectiveSystemOpen ) {
@@ -8605,9 +8626,11 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 		case IMPULSE_20: {
- 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
+			TowerManager::ToggleHelpMenu();
+			hud->HandleNamedEvent("toggleHelp");
+ 			/*if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
  				gameLocal.mpGame.ToggleTeam( );
-			}
+			}*/
 			break;
 		}
 		case IMPULSE_21: {

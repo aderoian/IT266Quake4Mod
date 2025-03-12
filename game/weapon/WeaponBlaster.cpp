@@ -610,11 +610,16 @@ void rvWeaponBlaster::Attack(bool altAttack, int num_attacks, float spread, floa
 		viewModel->PostGUIEvent("weapon_noammo");
 	}
 
-	if (gameLocal.towerManager->buildMode) {
+	TowerManager* tm = gameLocal.towerManager;
+	if (tm && tm->buildMode > 0) {
 		idVec3 hitPos = Tower_Raycast(altAttack ? attackAltDict : attackDict, muzzleOrigin, muzzleAxis, num_attacks, spread, power);
 
-		gameLocal.towerManager->BuildTower(hitPos + idVec3(0, 0, 10));
-		return;
+		if (tm->buildMode == 1) {
+			tm->BuildTower(hitPos);
+		}
+		else if (tm->buildMode == 2) {
+			tm->UpgradeTower(hitPos);
+		}
 	}
 
 	// The attack is either a hitscan or a launched projectile, do that now.

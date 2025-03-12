@@ -74,16 +74,36 @@ void Tower::SpawnTower()
 	}
 
 	towerEntity = newEnt;
-	towerEntity->health = 100; // TODO: tower health
+	towerEntity->health = towerDef->health;
 	init = true;
 }
 
 void Tower::ShootHitscan(Tower* tower, idVec3 target, const idDict* dict)
 {
+	if (tower->origin->Dist(target) > tower->GetRange()) return;
 	idVec3 start = *tower->origin + (idVec3(0, 0, 1) * 50);
 	idVec3 dir = target - start;
 	dir.Normalize();
 	idEntity* hit = gameLocal.HitScan(*dict, start, dir, start, tower->towerEntity, false);
+
+	Wave* wave = gameLocal.towerManager->wave;
+	if (hit && wave->IsMonsterMember(hit)) {
+		tower->Damage(hit);
+	}
+}
+
+void Tower::Damage(idEntity* target)
+{
+	if (!target) return;
+	int damage = GetDamage();
+
+	//gameLocal.Printf("Tower %s damaged monster %s for %d\n", name, target->name, damage);
+	target->health -= damage;
+
+	if (target->health <= 0) {
+		//gameLocal.Printf("Monster %s has been killed by tower %s\n", target->name, name);
+		target->Killed(towerEntity, towerEntity, damage, idVec3(0, 0, 0), 0);
+	}
 }
 
 void Tower::Update(void)
@@ -134,7 +154,7 @@ void Tower::ForceShoot(void)
 
 void Tower::Upgrade(void)
 {
-	if (level > towerDef->upgrades.Num()) return;
+	if (level > towerDef->upgrades.Num() - 1) return;
 
 	idPlayer* player = gameLocal.GetLocalPlayer();
 	if (!player) return;
@@ -148,11 +168,15 @@ void Tower::Upgrade(void)
 	player->inventory.ProcessTransaction(upgrade.cost, true);
 	player->inventory.ProcessBuilderTransaction(1, true);
 
+	towerEntity->health = upgrade.health;
 	level++;
 }
 
 void Tower::ShootDarkMatter(Tower* tower, idVec3 target)
 {
+	if (tower->origin->Dist(target) > tower->GetRange()) return;
+	if (!gameLocal.GetLocalPlayer()->inventory.ProcessEnergyTransaction(10, true)) return;
+
 	const idDict* dict = gameLocal.FindEntityDefDict("projectile_dmg", false);
 
 	idVec3 start = *tower->origin + (idVec3(0, 0, 1) * 50);
@@ -173,6 +197,7 @@ void Tower::ShootDarkMatter(Tower* tower, idVec3 target)
 
 void Tower::ShootGauntlet(Tower* tower, idVec3 target)
 {
+	if (tower->origin->Dist(target) > tower->GetRange()) return;
 	const idDict* dict = gameLocal.FindEntityDefDict("projectile_hyperblaster", false);
 
 	idList<idVec3> dirs;
@@ -204,6 +229,7 @@ void Tower::ShootGauntlet(Tower* tower, idVec3 target)
 
 void Tower::ShootGrenadeLauncher(Tower* tower, idVec3 target)
 {
+	if (tower->origin->Dist(target) > tower->GetRange()) return;
 	const idDict* dict = gameLocal.FindEntityDefDict("projectile_grenade", false);
 	idVec3 start = *tower->origin + idVec3(0, 0, 50);
 	idVec3 flatDir = target - start;
@@ -238,6 +264,9 @@ void Tower::ShootGrenadeLauncher(Tower* tower, idVec3 target)
 
 void Tower::ShootHyperBlaster(Tower* tower, idVec3 target)
 {
+	if (tower->origin->Dist(target) > tower->GetRange()) return;
+	if (!gameLocal.GetLocalPlayer()->inventory.ProcessEnergyTransaction(2, true)) return;
+
 	const idDict* dict = gameLocal.FindEntityDefDict("projectile_hyperblaster", false);
 
 	if (!dict) {
@@ -384,7 +413,7 @@ TowerManager::TowerManager(void)
 
 	entityId = 0;
 
-	buildMode = false;
+	buildMode = 0;
 	buildTower = nullptr;
 
 	lastWaveStart = -1;
@@ -397,40 +426,134 @@ TowerManager::TowerManager(void)
 	monsterDefinitions = DefList<WaveMonsterDef*>();
 	towers = idList<Tower*>();
 	gameStarted = false;
+	spawned = false;
 
 	// Register Tower Definitions
-	RegisterTower(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(), 10, 10000, 2000, Tower::ShootDarkMatter, {}));
-	RegisterTower(new TowerDef("gauntlet", "weapon_gauntlet_world", ResourceCost(), 10, 10000, 250, Tower::ShootGauntlet, {}));
-	RegisterTower(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(), 10, 10000, 1000, Tower::ShootGrenadeLauncher, {}));
-	RegisterTower(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(), 10, 1000, 250, Tower::ShootHyperBlaster, {}));
-	RegisterTower(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 10, 500, 250, Tower::ShootLightning, {}));
-	RegisterTower(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(10, 10, 10), 10, 500, 100000, Tower::ShootMachineGun, {}));
-	RegisterTower(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(), 10, 10000, 250, Tower::ShootNailGun, {}));
-	RegisterTower(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(), 10, 10000, 250, Tower::ShootNapalm, {}));
-	RegisterTower(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(), 10, 500, 250, Tower::ShootRailgun, {}));
-	RegisterTower(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(), 10, 10000, 1500, Tower::ShootRocketLauncher, {}));
+
+	idList<TowerDef> darkMatterUpgrades;
+	darkMatterUpgrades.Append(TowerDef("", "", ResourceCost(15000, 15000, 15000), 700, 325, 8200, 9000, Tower::ShootDarkMatter, {}));
+	darkMatterUpgrades.Append(TowerDef("", "", ResourceCost(20000, 20000, 20000), 900, 350, 8400, 8000, Tower::ShootDarkMatter, {}));
+	darkMatterUpgrades.Append(TowerDef("", "", ResourceCost(25000, 25000, 25000), 1100, 375, 8600, 7000, Tower::ShootDarkMatter, {}));
+	darkMatterUpgrades.Append(TowerDef("", "", ResourceCost(30000, 30000, 30000), 1300, 400, 8800, 6000, Tower::ShootDarkMatter, {}));
+	darkMatterUpgrades.Append(TowerDef("", "", ResourceCost(35000, 35000, 35000), 1500, 425, 9000, 5000, Tower::ShootDarkMatter, {}));
+	RegisterTower(new TowerDef("dark_matter", "weapon_dmg_world", ResourceCost(10000, 10000, 10000), 500, 300, 8000, 10000, Tower::ShootDarkMatter, darkMatterUpgrades));
+	
+	idList<TowerDef> gauntletUpgrades;
+	gauntletUpgrades.Append(TowerDef("", "", ResourceCost(750, 750, 750), 325, 55, 800, 850, Tower::ShootGauntlet, {}));
+	gauntletUpgrades.Append(TowerDef("", "", ResourceCost(1500, 1500, 1500), 400, 65, 800, 800, Tower::ShootGauntlet, {}));
+	gauntletUpgrades.Append(TowerDef("", "", ResourceCost(2250, 2250, 2250), 475, 75, 800, 750, Tower::ShootGauntlet, {}));
+	gauntletUpgrades.Append(TowerDef("", "", ResourceCost(3000, 3000, 3000), 550, 85, 800, 700, Tower::ShootGauntlet, {}));
+	gauntletUpgrades.Append(TowerDef("", "", ResourceCost(3750, 3750, 3750), 625, 95, 800, 650, Tower::ShootGauntlet, {}));
+	RegisterTower(new TowerDef("gauntlet", "weapon_shotgun_world", ResourceCost(500, 500, 500), 250, 35, 750, 1000, Tower::ShootGauntlet, gauntletUpgrades));
+
+	idList<TowerDef> grenadeLauncherUpgrades;
+	grenadeLauncherUpgrades.Append(TowerDef("", "", ResourceCost(1200, 800, 500), 250, 75, 1050, 4500, Tower::ShootGrenadeLauncher, {}));
+	grenadeLauncherUpgrades.Append(TowerDef("", "", ResourceCost(1600, 1000, 750), 300, 90, 1100, 4000, Tower::ShootGrenadeLauncher, {}));
+	grenadeLauncherUpgrades.Append(TowerDef("", "", ResourceCost(2000, 1200, 1000), 350, 110, 1150, 3500, Tower::ShootGrenadeLauncher, {}));
+	grenadeLauncherUpgrades.Append(TowerDef("", "", ResourceCost(2400, 1400, 1250), 400, 130, 1200, 3000, Tower::ShootGrenadeLauncher, {}));
+	grenadeLauncherUpgrades.Append(TowerDef("", "", ResourceCost(2800, 1600, 1500), 450, 150, 1250, 2500, Tower::ShootGrenadeLauncher, {}));
+	RegisterTower(new TowerDef("grenade_launcher", "weapon_grenadelauncher_world", ResourceCost(1000, 600, 400), 200, 50, 1000, 5000, Tower::ShootGrenadeLauncher, grenadeLauncherUpgrades));
+
+	idList<TowerDef> hyperblasterUpgrades;
+	hyperblasterUpgrades.Append(TowerDef("", "", ResourceCost(500, 400, 300), 150, 20, 1100, 450, Tower::ShootHyperBlaster, {}));
+	hyperblasterUpgrades.Append(TowerDef("", "", ResourceCost(750, 600, 400), 200, 30, 1200, 400, Tower::ShootHyperBlaster, {}));
+	hyperblasterUpgrades.Append(TowerDef("", "", ResourceCost(1000, 800, 500), 250, 40, 1300, 350, Tower::ShootHyperBlaster, {}));
+	hyperblasterUpgrades.Append(TowerDef("", "", ResourceCost(1250, 1000, 600), 300, 50, 1400, 300, Tower::ShootHyperBlaster, {}));
+	hyperblasterUpgrades.Append(TowerDef("", "", ResourceCost(1500, 1200, 700), 350, 60, 1500, 250, Tower::ShootHyperBlaster, {}));
+	RegisterTower(new TowerDef("hyperblaster", "weapon_hyperblaster_world", ResourceCost(400, 300, 200), 100, 10, 1000, 500, Tower::ShootHyperBlaster, hyperblasterUpgrades));
+
+	RegisterTower(new TowerDef("lightning", "weapon_lightninggun_world", ResourceCost(), 100, 10, 800, 4000, Tower::ShootLightning, {}));
+
+	idList <TowerDef> machineGunUpgrades;
+	machineGunUpgrades.Append(TowerDef("", "", ResourceCost(100, 100, 100), 200, 20, 500, 225, Tower::ShootMachineGun, {}));
+	machineGunUpgrades.Append(TowerDef("", "", ResourceCost(200, 200, 200), 300, 30, 500, 200, Tower::ShootMachineGun, {}));
+	machineGunUpgrades.Append(TowerDef("", "", ResourceCost(300, 300, 300), 400, 40, 500, 175, Tower::ShootMachineGun, {}));
+	machineGunUpgrades.Append(TowerDef("", "", ResourceCost(400, 400, 400), 500, 50, 500, 150, Tower::ShootMachineGun, {}));
+	machineGunUpgrades.Append(TowerDef("", "", ResourceCost(500, 500, 500), 600, 60, 500, 125, Tower::ShootMachineGun, {}));
+	RegisterTower(new TowerDef("machine_gun", "weapon_machinegun_world", ResourceCost(10, 10, 10), 100, 10, 450, 250, Tower::ShootMachineGun, machineGunUpgrades));
+
+	idList<TowerDef> nailgunUpgrades;
+	nailgunUpgrades.Append(TowerDef("", "", ResourceCost(600, 500, 400), 200, 15, 1600, 550, Tower::ShootNailGun, {}));
+	nailgunUpgrades.Append(TowerDef("", "", ResourceCost(900, 700, 600), 250, 25, 1700, 500, Tower::ShootNailGun, {}));
+	nailgunUpgrades.Append(TowerDef("", "", ResourceCost(1200, 900, 800), 300, 35, 1800, 450, Tower::ShootNailGun, {}));
+	nailgunUpgrades.Append(TowerDef("", "", ResourceCost(1500, 1100, 1000), 350, 45, 1900, 400, Tower::ShootNailGun, {}));
+	nailgunUpgrades.Append(TowerDef("", "", ResourceCost(1800, 1300, 1200), 400, 55, 2000, 350, Tower::ShootNailGun, {}));
+	RegisterTower(new TowerDef("nailgun", "weapon_nailgun_world", ResourceCost(500, 400, 300), 150, 10, 1500, 600, Tower::ShootNailGun, nailgunUpgrades));
+
+	idList<TowerDef> napalmUpgrades;
+	napalmUpgrades.Append(TowerDef("", "", ResourceCost(2500, 2000, 1500), 300, 50, 800, 4800, Tower::ShootNapalm, {}));
+	napalmUpgrades.Append(TowerDef("", "", ResourceCost(3000, 2500, 2000), 350, 60, 850, 4600, Tower::ShootNapalm, {}));
+	napalmUpgrades.Append(TowerDef("", "", ResourceCost(3500, 3000, 2500), 400, 70, 900, 4400, Tower::ShootNapalm, {}));
+	napalmUpgrades.Append(TowerDef("", "", ResourceCost(4000, 3500, 3000), 450, 80, 950, 4200, Tower::ShootNapalm, {}));
+	napalmUpgrades.Append(TowerDef("", "", ResourceCost(4500, 4000, 3500), 500, 90, 1000, 4000, Tower::ShootNapalm, {}));
+	RegisterTower(new TowerDef("napalm", "weapon_napalmgun_world", ResourceCost(2000, 1500, 1000), 250, 40, 750, 5000, Tower::ShootNapalm, napalmUpgrades));
+
+	idList<TowerDef> railgunUpgrades;
+	railgunUpgrades.Append(TowerDef("", "", ResourceCost(2000, 1500, 1000), 300, 140, 2000, 4000, Tower::ShootRailgun, {}));
+	railgunUpgrades.Append(TowerDef("", "", ResourceCost(2500, 2000, 1500), 400, 150, 2100, 3500, Tower::ShootRailgun, {}));
+	railgunUpgrades.Append(TowerDef("", "", ResourceCost(3000, 2500, 2000), 500, 160, 2200, 3000, Tower::ShootRailgun, {}));
+	railgunUpgrades.Append(TowerDef("", "", ResourceCost(3500, 3000, 2500), 600, 170, 2300, 2500, Tower::ShootRailgun, {}));
+	railgunUpgrades.Append(TowerDef("", "", ResourceCost(4000, 3500, 3000), 700, 180, 2400, 2000, Tower::ShootRailgun, {}));
+	RegisterTower(new TowerDef("railgun", "weapon_railgun_world", ResourceCost(1500, 1000, 500), 200, 130, 2900, 4500, Tower::ShootRailgun, railgunUpgrades));
+	
+	idList<TowerDef> rocketLauncherUpgrades;
+	rocketLauncherUpgrades.Append(TowerDef("", "", ResourceCost(2000, 1500, 1000), 400, 50, 1200, 4000, Tower::ShootRocketLauncher, {}));
+	rocketLauncherUpgrades.Append(TowerDef("", "", ResourceCost(2500, 2000, 1500), 500, 60, 1300, 3500, Tower::ShootRocketLauncher, {}));
+	rocketLauncherUpgrades.Append(TowerDef("", "", ResourceCost(3000, 2500, 2000), 600, 70, 1400, 3000, Tower::ShootRocketLauncher, {}));
+	rocketLauncherUpgrades.Append(TowerDef("", "", ResourceCost(3500, 3000, 2500), 700, 80, 1500, 2500, Tower::ShootRocketLauncher, {}));
+	rocketLauncherUpgrades.Append(TowerDef("", "", ResourceCost(4000, 3500, 3000), 800, 90, 1600, 2000, Tower::ShootRocketLauncher, {}));
+	RegisterTower(new TowerDef("rocketlauncher", "weapon_rocketlauncher_world", ResourceCost(1500, 1000, 500), 200, 40, 1000, 4500, Tower::ShootRocketLauncher, rocketLauncherUpgrades));
 
 	// Economy Towers
-	RegisterTower(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateGold, {}));
-	RegisterTower(new TowerDef("energy_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateEnergy, {}));
-	RegisterTower(new TowerDef("stone_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateStone, {}));
-	RegisterTower(new TowerDef("wood_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateWood, {}));
-	RegisterTower(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(0, 0, 0), 5, 0, 1000, Tower::GenerateBuilder, {}));
+	idList<TowerDef> goldGeneratorUpgrades;
+	goldGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(1000, 1000, 1000), 100, 5, 0, 900, Tower::GenerateGold, {}));
+	goldGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(2000, 2000, 2000), 200, 6, 0, 800, Tower::GenerateGold, {}));
+	goldGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(3000, 3000, 3000), 300, 7, 0, 700, Tower::GenerateGold, {}));
+	goldGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(4000, 4000, 4000), 400, 8, 0, 600, Tower::GenerateGold, {}));
+	goldGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(5000, 5000, 5000), 500, 9, 0, 250, Tower::GenerateGold, {}));
+	RegisterTower(new TowerDef("gold_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(100, 100, 100), 150, 1, 0, 1000, Tower::GenerateGold, goldGeneratorUpgrades));
+
+	idList<TowerDef> energyGeneratorUpgrades;
+	energyGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(1000, 1000, 1000), 100, 5, 0, 900, Tower::GenerateEnergy, {}));
+	energyGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(2000, 2000, 2000), 200, 6, 0, 800, Tower::GenerateEnergy, {}));
+	energyGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(3000, 3000, 3000), 300, 7, 0, 700, Tower::GenerateEnergy, {}));
+	energyGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(4000, 4000, 4000), 400, 8, 0, 600, Tower::GenerateEnergy, {}));
+	energyGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(5000, 5000, 5000), 500, 9, 0, 250, Tower::GenerateEnergy, {}));
+	RegisterTower(new TowerDef("energy_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(100, 100, 100), 150, 1, 0, 1000, Tower::GenerateEnergy, energyGeneratorUpgrades));
+
+	idList<TowerDef> stoneGeneratorUpgrades;
+	stoneGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(1000, 1000, 1000), 100, 5, 0, 900, Tower::GenerateStone, {}));
+	stoneGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(2000, 2000, 2000), 200, 6, 0, 800, Tower::GenerateStone, {}));
+	stoneGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(3000, 3000, 3000), 300, 7, 0, 700, Tower::GenerateStone, {}));
+	stoneGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(4000, 4000, 4000), 400, 8, 0, 600, Tower::GenerateStone, {}));
+	stoneGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(5000, 5000, 5000), 500, 9, 0, 250, Tower::GenerateStone, {}));
+	RegisterTower(new TowerDef("stone_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(100, 100, 100), 150, 1, 0, 1000, Tower::GenerateStone, stoneGeneratorUpgrades));
+
+	idList<TowerDef> woodGeneratorUpgrades;
+	woodGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(1000, 1000, 1000), 100, 5, 0, 900, Tower::GenerateWood, {}));
+	woodGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(2000, 2000, 2000), 200, 6, 0, 800, Tower::GenerateWood, {}));
+	woodGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(3000, 3000, 3000), 300, 7, 0, 700, Tower::GenerateWood, {}));
+	woodGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(4000, 4000, 4000), 400, 8, 0, 600, Tower::GenerateWood, {}));
+	woodGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(5000, 5000, 5000), 500, 9, 0, 250, Tower::GenerateWood, {}));
+	RegisterTower(new TowerDef("wood_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(100, 100, 100), 150, 1, 0, 1000, Tower::GenerateWood, woodGeneratorUpgrades));
+
+	idList<TowerDef> builderGeneratorUpgrades;
+	builderGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(1000, 1000, 1000), 100, 1, 0, 900, Tower::GenerateBuilder, {}));
+	builderGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(2000, 2000, 2000), 200, 1, 0, 800, Tower::GenerateBuilder, {}));
+	builderGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(3000, 3000, 3000), 300, 2, 0, 700, Tower::GenerateBuilder, {}));
+	builderGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(4000, 4000, 4000), 400, 2, 0, 600, Tower::GenerateBuilder, {}));
+	builderGeneratorUpgrades.Append(TowerDef("", "", ResourceCost(5000, 5000, 5000), 500, 3, 0, 250, Tower::GenerateBuilder, {}));
+	RegisterTower(new TowerDef("builder_generator", "models/pick_ups/sp_pickups/sp_darkmatter.lwo", ResourceCost(100, 100, 100), 150, 1, 0, 1000, Tower::GenerateBuilder, builderGeneratorUpgrades));
 
 	// Register Monster Definitions
-	RegisterMonster(new WaveMonsterDef("monster_berserker", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_gladiator", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_bossbuddy", 100, 50, 1));
-	//RegisterMonster(new WaveMonsterDef("monster_convoy_ground", 100, 50, 1));
-	//RegisterMonster(new WaveMonsterDef("monster_convoy_hover", 100, 50, 1));
-	//RegisterMonster(new WaveMonsterDef("monster_fatty", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_grunt", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_gunner", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_hh_tank", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_iron_maiden", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_lt_tank", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_makron", 100, 50, 1));
-	RegisterMonster(new WaveMonsterDef("monster_network_guardian", 100, 50, 1));
+	RegisterMonster(new WaveMonsterDef("monster_berserker", 300, 10, 1));
+	RegisterMonster(new WaveMonsterDef("monster_gladiator", 400, 10, 2));
+	RegisterMonster(new WaveMonsterDef("monster_grunt", 500, 10, 2));
+	RegisterMonster(new WaveMonsterDef("monster_gunner", 700, 10, 3));
+	RegisterMonster(new WaveMonsterDef("monster_hh_tank", 900, 10, 3));
+	RegisterMonster(new WaveMonsterDef("monster_iron_maiden", 1100, 10, 4));
+	RegisterMonster(new WaveMonsterDef("monster_lt_tank", 1500, 10, 4));
+	RegisterMonster(new WaveMonsterDef("monster_network_guardian", 5000, 10, 5));
 }
 
 TowerManager::~TowerManager(void)
@@ -463,8 +586,20 @@ void TowerManager::RegisterMonster(WaveMonsterDef* def)
 
 void TowerManager::Update(void)
 {
+	if (!spawned) {
+		if (gameLocal.GetLocalPlayer()) {
+			gameLocal.GetLocalPlayer()->GetPhysics()->SetOrigin(idVec3(10031, -8275, 128));
+			spawned = true;
+			gameLocal.GetLocalPlayer()->godmode = true;
+		}
+		else
+		{
+			return;
+		}
+	}
+
 	if (!gameStarted) {
-		if (towers.Num() > 20) {
+		if (towers.Num() > 3) {
 			gameStarted = true;
 		}
 		else {
@@ -509,7 +644,7 @@ bool TowerManager::CanTowersShoot(void)
 
 void TowerManager::ToggleBuild(void)
 {
-	buildMode = !buildMode;
+	buildMode = (buildMode + 1) % 3;
 }
 
 void TowerManager::SetBuildTowerFromKey(int impulse)
@@ -588,6 +723,13 @@ void TowerManager::BuildTower(idVec3 origin)
 	AddTower(tower);
 }
 
+void TowerManager::UpgradeTower(idVec3 origin)
+{
+	Tower* tower = FindTower(origin);
+	if (!tower) return;
+	tower->Upgrade();
+}
+
 void TowerManager::DestroyTower(Tower* tower)
 {
 	if (!tower) return;
@@ -658,7 +800,6 @@ Tower* TowerManager::FindTower(idVec3 origin)
 
 Tower* TowerManager::FindTower(const char* name)
 {
-	gameLocal.Printf("Finding tower '%s'\n", name);
 	for (int i = 0; i < towers.Num(); i++)
 	{
 		auto tName = towers[i]->name;
@@ -777,10 +918,14 @@ bool Wave::HasEnded(void)
 	return monstersLeft == 0;
 }
 
-bool Wave::IsMonsterMember(idAI* monster)
+bool Wave::IsMonsterMember(idEntity* monster)
 {
 	if (!monster) return false;
-	return monsters.FindIndex(monster) != -1;
+
+	auto mon = dynamic_cast<idAI*>(monster);
+	if (!mon) return false;
+
+	return monsters.FindIndex(mon) != -1;
 }
 
 void Wave::OnMonsterKilled(idAI* monster)
@@ -796,18 +941,13 @@ void Wave::OnAttack(idAI* monster, idEntity* target, idEntity* projectile)
 	if (!monster || !target) return;
 	if (!IsMonsterMember(monster)) return;
 
-	gameLocal.Printf("Monster '%s' attacked target '%s'\n", monster->name.c_str(), target->name.c_str());
-
 	idList<idStr> name;
 	monster->name.Split(name, '-');
 	if (name.Num() < 2) return;
-
-	gameLocal.Printf("Monster '%s' attacked target '%s'\n", name[0].c_str(), target->name.c_str());
-	int damage = gameLocal.towerManager->monsterDefinitions[name[0]]->baseDamage;
+	int damage = gameLocal.towerManager->monsterDefinitions[name[0]]->baseDamage * (gameLocal.towerManager->waveCount / 2);
 	auto tower = gameLocal.towerManager->FindTower(target->name);
 
 	if (tower) {
-		gameLocal.Printf("Monster '%s' attacked target '%s' with damage '%d'\n", name[0].c_str(), target->name.c_str(), damage);
 		tower->towerEntity->health -= damage;
 	}
 }
@@ -844,7 +984,6 @@ void Wave::SpawnMonster(idStr type)
 	int x = gameLocal.random.RandomInt(x1 - x2) + x2;
 	int y = gameLocal.random.RandomInt(y1 - y2) + y2;
 	idVec3 origin = idVec3(x, y, 140);
-	gameLocal.Printf("Spawning monster '%s' at '%s'\n", type.c_str(), origin.ToString());
 
 	WaveMonsterDef* monsterDef = gameLocal.towerManager->monsterDefinitions[type];
 	if (!monsterDef) return;
@@ -855,16 +994,17 @@ void Wave::SpawnMonster(idStr type)
 	dict.Set("name", va("%s-%d", monsterDef->name.c_str(), gameLocal.towerManager->entityId++));
 	dict.Set("target", gameLocal.towerManager->towers[0]->name);
 
-	idEntity* newEnt = nullptr;
+	idEntity* newEnt;
 	gameLocal.SpawnEntityDef(dict, &newEnt);
 
 	if (newEnt) {
 		gameLocal.Printf("spawned entity '%s'\n", newEnt->name.c_str());
+
+		idAI* ai = dynamic_cast<idAI*>(newEnt);
+		if (!ai) return;
+		ai->health = monsterDef->baseHealth * (gameLocal.towerManager->waveCount / 2.0);
+		monsters.Append(ai);
 	}
-
-	idAI* ai = dynamic_cast<idAI*>(newEnt);
-
-	monsters.Append(ai);
 }
 
 template class DefList<TowerDef*>;

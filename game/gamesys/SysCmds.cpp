@@ -3149,7 +3149,9 @@ void Cmd_ShootTower_f(const idCmdArgs& args) {
 	if (args.Argc() < 2) {
 		for (int i = 0; i < towerManager->towers.Num(); i++) {
 			auto tower = towerManager->towers[i];
-			tower->ForceShoot();
+
+			tower->towerDef->shootFunc(tower, player->GetChestPosition());
+			//tower->ForceShoot();
 		}
 
 		return;
@@ -3160,7 +3162,7 @@ void Cmd_ShootTower_f(const idCmdArgs& args) {
 		return;
 	}
 	auto tower = towerManager->towers[towerIndex];
-	tower->ForceShoot();
+	tower->towerDef->shootFunc(tower, player->GetChestPosition());
 }
 
 void Cmd_CreateWave_f(const idCmdArgs& args) {
@@ -3204,7 +3206,7 @@ void Cmd_ListWave_f(const idCmdArgs& args) {
 		auto monster = wave->monsters[i];
 		if (!monster) continue;
 		auto target = monster->enemy.ent.GetEntity();
-		gameLocal.Printf("Monster: %s | Target: %s\n", wave->monsters[i]->name.c_str(), target ? target->name.c_str() : "NO TARGET");
+		gameLocal.Printf("Monster: %s | Target: %s | Health: %d\n", wave->monsters[i]->name.c_str(), target ? target->name.c_str() : "NO TARGET", monster->health);
 	}
 }
 
