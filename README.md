@@ -2,7 +2,7 @@
 
 A Quake 4 mod created by Armen Deroia for NJIT IT266.
 
-## Instalation
+## Installation
 1. Install Quake 4 from steam
 2. Naviage to the Quake 4 install folder. (usually C:\Program Files (x86)\Steam\steamapps\common\Quake 4\)
 3. Download the 3 files from releases (pak001.pk4, game000.pk4, Quake4Config.cfg)
